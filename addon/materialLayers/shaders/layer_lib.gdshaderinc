@@ -45,6 +45,12 @@ float   RESULT_HEIGHT = 0.5; \
 float   RESULT_AO = 1.0; \
 float   RESULT_METALLIC = 0.0; \
 vec3    RESULT_EMISSION = vec3(0.0); \
+vec3    RESULT_BENT_NORMAL = vec3(0.5, 0.5, 1.0); \
+vec3    RESULT_MESH_NORMAL_MAP = vec3(0.5, 0.5, 1.0); \
+float   RESULT_MESH_AO = 0.0; \
+float   RESULT_MESH_HEIGHT = 0.0; \
+float   RESULT_MESH_CURVATURE = 0.0; \
+float   RESULT_MESH_THICKNESS = 0.0; \
 vec4    LAYER_OUT_TEX_0; \
 vec4    LAYER_OUT_TEX_1; \
 vec4    LAYER_OUT_TEX_2; \

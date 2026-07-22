@@ -118,7 +118,7 @@ const FRAGMENT_LAYER_BELOW_FIELDS := {
     "LAYER_BELOW_ALBEDO":     "layer_mat_albedo",
     "LAYER_BELOW_NORMAL_MAP": "layer_mat_normal_map",
 	"LAYER_BELOW_MESH_NORMAL_MAP": "layer_mat_mesh_normal_map",
-    "LAYER_BELOW_BENT_NORMALS": "layer_mat_bent_normal",
+    "LAYER_BELOW_BENT_NORMAL": "layer_mat_bent_normal",
     "LAYER_BELOW_ROUGHNESS":  "layer_mat_roughness",
     "LAYER_BELOW_AO":         "layer_mat_ao",
     "LAYER_BELOW_HEIGHT":     "layer_mat_height",
@@ -134,7 +134,7 @@ const FRAGMENT_LAYER_CURRENT_FIELDS := {
     "LAYER_CURRENT_ALBEDO":     "layer_mat_albedo",
     "LAYER_CURRENT_NORMAL_MAP": "layer_mat_normal_map",
 	"LAYER_CURRENT_MESH_NORMAL_MAP": "layer_mat_mesh_normal_map",
-    "LAYER_CURRENT_BENT_NORMALS": "layer_mat_bent_normal",
+    "LAYER_CURRENT_BENT_NORMAL": "layer_mat_bent_normal",
     "LAYER_CURRENT_ROUGHNESS":  "layer_mat_roughness",
     "LAYER_CURRENT_AO":         "layer_mat_ao",
     "LAYER_CURRENT_HEIGHT":     "layer_mat_height",
@@ -150,7 +150,7 @@ const FRAGMENT_LAYER_RESULT_FIELDS := {
     "RESULT_ALBEDO":     "layer_mat_albedo",
     "RESULT_NORMAL_MAP": "layer_mat_normal_map",
 	"RESULT_MESH_NORMAL_MAP": "layer_mat_mesh_normal_map",
-    "RESULT_BENT_NORMALS": "layer_mat_bent_normal",
+    "RESULT_BENT_NORMAL": "layer_mat_bent_normal",
     "RESULT_ROUGHNESS":  "layer_mat_roughness",
     "RESULT_AO":         "layer_mat_ao",
     "RESULT_HEIGHT":     "layer_mat_height",
@@ -1128,15 +1128,24 @@ func parse_layer_data_in_out(statements: Array, index: int):
 		for out_name in out_regex_map:
 			s.text = out_regex_map[out_name].sub(s.text,"%s.%s" % [out_struct_name, LAYER_DATA_OUT_FIELDS[out_name]], true)
 
+		# Resolve LAYER_BELOW_* by slot, the same way parse_fragment_in_out does.
+		# finalLayerData is not declared until the end of layer 0's block, so
+		# layers 0 and 1 must not reference it.
+		var below_source := below_struct_name
+		if index == 0:
+			below_source = "DEFAULT_LAYER_DATA"
+		elif index == 1:
+			below_source = "layer_0_data"
+
 		for in_name in below_regex_map:
 			s.text = below_regex_map[in_name].sub(
 				s.text,
-				"%s.%s" % [below_struct_name, LAYER_DATA_BELOW_FIELDS[in_name]],
+				"%s.%s" % [below_source, LAYER_DATA_BELOW_FIELDS[in_name]],
 				true
 			)
 
 		result.append(s)
-	
+
 	return result
 
 
@@ -1180,20 +1189,28 @@ func prefix_vertex_samplers(all_vertex_funcs: Array, originals: Array, renames: 
 	return result
 
 
+## Namespaces the uniforms and samplers that a helper function body references.
+## The function names themselves are already prefixed by parse_helper_funcs();
+## this pass is what stops a helper reading an unprefixed uniform.
 func prefix_helper_funcs(functions: Array, identifiers: Array, is_mask: bool, index: int) -> Array:
+	var result := []
+	for fn in functions:
+		result.append(prefix_vertex_fragment(fn, identifiers, is_mask, index))
+	return result
+
+
+## Renames call sites of a layer's own helper functions so they match the
+## prefixed definitions. prefix_vertex_fragment() deliberately skips anything
+## followed by "(", so calls have to be rewritten here instead.
+func prefix_function_calls(body: String, func_names: Array, is_mask: bool, index: int) -> String:
 	var prefix := "s_layer_%d_" % index
 	if is_mask:
 		prefix = "m_layer_%d_" % index
-	var result := []
-	var body := ""
-
-	for fn in functions:
-		body = fn
-
-		for identifier in identifiers:
-			var regex := RegEx.new()
-			regex.compile("\\b" + identifier + "\\b")
-			result.append(regex.sub(body, prefix + identifier, true))
+	var result := body
+	for func_name in func_names:
+		var regex := RegEx.new()
+		regex.compile("\\b" + func_name + "\\b(?=\\s*\\()")
+		result = regex.sub(result, prefix + func_name, true)
 	return result
 
 
@@ -1468,7 +1485,12 @@ func _generate_code(assets: Array) -> String:
 			var mask_parsed_vertex := parse_vertex(mask_vertex, slot)
 			mask_vertex_body = mask_parsed_vertex["vertex"]
 
-		
+			mask_helper_funcs["functions"] = prefix_helper_funcs(
+				mask_helper_funcs["functions"],
+				mask_uniforms["uniform_identifiers"] + mask_uniforms["sampler_identifiers"],
+				true, slot)
+
+
 			all_includes.append_array(mask_includes)
 			all_global_macros.append_array(mask_global_macros)
 			all_uniforms.append_array(mask_uniforms["uniforms"])
@@ -1496,7 +1518,9 @@ func _generate_code(assets: Array) -> String:
 			})
 
 			mask_fragment_body = prefix_vertex_fragment(mask_fragment_body, all_identifiers, true, slot)
+			mask_fragment_body = prefix_function_calls(mask_fragment_body, mask_helper_funcs["identifiers"], true, slot)
 			mask_vertex_body = prefix_vertex_fragment(mask_vertex_body, vertex_identifiers, true, slot)
+			mask_vertex_body = prefix_function_calls(mask_vertex_body, mask_helper_funcs["identifiers"], true, slot)
 
 		
 		var surface_global_macros := get_global_macros(surface_c)
@@ -1508,8 +1532,12 @@ func _generate_code(assets: Array) -> String:
 
 		var parsed_varyings := parse_varyings(surface_c, slot)
 
-		var surface_helper_funcs := parse_helper_funcs(surface_c, true, slot)
-		
+		var surface_helper_funcs := parse_helper_funcs(surface_c, false, slot)
+		surface_helper_funcs["functions"] = prefix_helper_funcs(
+			surface_helper_funcs["functions"],
+			surface_uniforms["uniform_identifiers"] + surface_uniforms["sampler_identifiers"],
+			false, slot)
+
 		var surface_fragment := get_fragment(surface_c)
 		var surface_parsed_fragment := parse_fragment(surface_fragment, slot)
 		var surface_fragment_body: String = surface_parsed_fragment["fragment"]
@@ -1564,6 +1592,7 @@ func _generate_code(assets: Array) -> String:
 		vertex_identifiers.append_array(surface_parsed_vertex["identifiers"])
 
 		surface_fragment_body = prefix_vertex_fragment(surface_fragment_body, all_identifiers, false, slot)
+		surface_fragment_body = prefix_function_calls(surface_fragment_body, surface_helper_funcs["identifiers"], false, slot)
 		surface_fragment_body = blend_layer_data_block(surface_fragment_body,slot)
 		surface_fragment_body = blend_fragment_block(surface_fragment_body, mask_expr, slot, mask_type, mask_active)
 
@@ -1580,6 +1609,7 @@ func _generate_code(assets: Array) -> String:
 		all_fragment_funcs.append("\n")
 
 		surface_vertex_body = prefix_vertex_fragment(surface_vertex_body, vertex_identifiers, false, slot)
+		surface_vertex_body = prefix_function_calls(surface_vertex_body, surface_helper_funcs["identifiers"], false, slot)
 		surface_vertex_body = blend_vertex_block(surface_vertex_body, mask_expr, slot, mask_type, mask_active)
 
 		all_vertex_funcs.append(vertex_layer_out(slot))
