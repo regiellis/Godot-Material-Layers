@@ -1,2 +1,26 @@
+# Shader sources MUST check out with LF. Godot's preprocessor does not continue
+# a #define across "\" + CRLF, so a CRLF checkout silently collapses the
+# SETUP_LAYER_FRAGMENT / SETUP_LAYER_VERTEX macros in layer_lib.gdshaderinc and
+# breaks every SurfaceMaterial and MaskMaterial. Git for Windows defaults to
+# core.autocrlf=true, so without this a fresh Windows clone is unusable.
+*.gdshader     text eol=lf
+*.gdshaderinc  text eol=lf
+
+# Everything else Godot reads or writes, kept LF for consistency.
+*.gd           text eol=lf
+*.cfg          text eol=lf
+*.godot        text eol=lf
+*.tres         text eol=lf
+*.tscn         text eol=lf
+*.import       text eol=lf
+*.svg          text eol=lf
+*.md           text eol=lf
+*.ps1          text eol=lf
+
+# Warden tooling files carry recorded content hashes in .warden/manifest.json.
+# Normalising them changes those hashes and trips the integrity check.
+.claude/skills/** -text
+.warden/**        -text
+
 *.webp filter=lfs diff=lfs merge=lfs -text
 *.zip filter=lfs diff=lfs merge=lfs -text
