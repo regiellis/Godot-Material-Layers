@@ -1,64 +1,26 @@
 # Known issues
 
-Open defects in the addon. Every entry is reproduced by a failing test in `test/tests/cases/`, or by
-an explicit command.
+Minor open trade-offs in the addon, kept so nobody re-derives them. Every majority defect found in
+the 2026-07-22 audit has been fixed; the suite is fully green.
 
 Status as of 2026-07-22, Godot 4.7.1-rc, addon version 0.9.0.
-Run `.\test\run-tests.ps1` to see the current state: **171 checks, 1 failing**.
+Run `.\test\run-tests.ps1` to verify: **175 checks, 0 failing**.
 
-Already fixed on this branch, kept here only so the list is not mistaken for the full picture:
-CRLF checkouts destroying the shader macros; helper functions failing to compile; the `BENT_NORMAL`
-token tables disagreeing; `LAYER_BELOW_TEX_*` / `LAYER_BELOW_MASK_*` referencing `finalLayerData`
-before it was declared; and the parser dropping global `const`s, `#define`s, `struct`s,
-`instance uniform`s, array uniforms and `render_mode`. See the git history for those changes.
-
----
-
-## 1. Sampler deduplication bakes in the textures present at compile time
-
-**Severity: medium.**
-
-`dedup_samplers` compares texture RIDs across layers and, when two layers point at the same texture,
-deletes the second layer's sampler uniform and rewrites its references to the first. That is a sound
-size optimisation, but it is keyed on the texture assigned *at the moment Generate was pressed*.
-
-Assign a different texture to the second layer afterwards and there is no uniform left to receive
-it. The layer keeps rendering the first layer's texture until the user presses Generate again, with
-no indication anything is wrong. `_rebuild_uniform_maps()` on project load does not re-run dedup, so
-`copy_uniform_values` writes to a uniform that no longer exists and the write is silently ignored.
-
-**Fix direction:** either drop the optimisation, or re-run dedup on texture change, or keep
-per-layer uniforms and dedup only the sampler *bindings*.
-
-**Tests:** `test_resources.test_shared_texture_is_deduplicated`.
+Fixed on this branch, listed so this file is not mistaken for the full picture: CRLF checkouts
+destroying the shader macros; helper functions failing to compile; the `BENT_NORMAL` token tables
+disagreeing; `LAYER_BELOW_TEX_*` / `LAYER_BELOW_MASK_*` referencing `finalLayerData` before it was
+declared; the parser dropping global `const`s, `#define`s, `struct`s, `instance uniform`s, array
+uniforms and `render_mode`; sampler dedup baking compile-time textures into the shader; and a
+missing base layer emitting a broken shader instead of a clear error. See the git history.
 
 ---
 
-## 2. A stack with no base layer emits a broken shader
+## Smaller things
 
-**Severity: medium.**
-
-`_generate_code` skips any slot whose surface shader is null (`continue`). When the base layer is
-empty, slot 0 is skipped, so nothing ever declares `finalFragment` or `finalVertex`, and the layers
-above emit `vertexMaterial vertex_1_out = finalVertex;` against an undeclared name.
-
-Pressing Generate on a half-configured stack, which is the normal way to build one, produces a wall
-of shader errors rather than a message saying the base layer is required.
-
-**Fix direction:** validate before generating and `push_error` with a clear message, or seed the
-defaults when slot 0 is absent.
-
-**Tests:** `test_codegen.test_missing_base_layer` (currently passes, because it only asserts the
-result is not silently wrong; tighten it when this is fixed).
-
----
-
-## 3. Smaller things
-
-- **Dead code.** `get_fragment_macros` and `prefix_vertex_samplers` are never called.
-  `_base_layer_initialized`, `_layers_initialized` and `_compiled` are never read. `l_mixVertex` in
-  `layer_lib.gdshaderinc` is never called, because the vertex stage has no texture-mask blend path at
-  all: `blend_vertex_block` only seeds `finalVertex` at slot 0.
+- **Dead code.** `get_fragment_macros` is never called. `_base_layer_initialized`,
+  `_layers_initialized` and `_compiled` are never read. `l_mixVertex` in `layer_lib.gdshaderinc` is
+  never called, because the vertex stage has no texture-mask blend path at all: `blend_vertex_block`
+  only seeds `finalVertex` at slot 0.
 - **`get_global_macros` matches a macro that does not exist.** It searches for `SETUP_VARYINGS`,
   which is defined nowhere in the addon. If a user did define it, it would be emitted at global scope
   *and* left in the fragment body by the macro lifter, producing a duplicate.
@@ -66,13 +28,16 @@ result is not silently wrong; tighten it when this is fixed).
   that are dead once the real tokens have been rewritten to struct fields. Harmless, but it also means
   a token missing from the substitution tables compiles silently against a constant instead of
   erroring, which is how the `BENT_NORMAL` mismatch survived.
+- **Layers sharing a texture now cost one sampler slot each.** The deliberate price of removing
+  sampler dedup: a stack whose layers reuse the same texture declares one sampler uniform per layer.
+  Only relevant if a very deep stack approaches driver sampler limits on the Compatibility renderer.
 - **Texture masks always sample at raw `UV`.** `mask_texture_sample` hardcodes it, so a mask texture
   cannot be scaled, offset, or driven by UV2. `l_getChannel` takes a `uv` parameter it never uses.
 - **Helper functions cannot use layer tokens.** `LAYER_OUT_*` and friends are locals inside
   `fragment()`, so a helper referencing them does not compile. Only `fragment()` and `vertex()` bodies
   go through token substitution.
-- **A custom `light()` function is dropped** (now with a `push_warning` naming the layer). Supporting
-  it would mean deciding how N layers' light functions compose, which is the same design problem as
+- **A custom `light()` function is dropped** (with a `push_warning` naming the layer). Supporting it
+  would mean deciding how N layers' light functions compose, which is the same design problem as
   `render_mode` but harder.
 - **`group_uniforms` is silently dropped.** Cosmetic only: uniforms lose their inspector grouping,
   and the LayerStack inspector hides shader parameters anyway.
@@ -100,7 +65,8 @@ Recorded so the next pass does not re-investigate:
 
 - The real example stack (`examples/material-layers-vcol-heightblend-example.zip`, three layers with a
   height-blend vertex-colour mask material) compiles cleanly through every change on this branch.
-- Uniform values propagate live after `compile()` without a recompile.
+- Uniform values propagate live after `compile()` without a recompile, including a texture swap on a
+  layer whose texture was shared with another layer at Generate time.
 - Layers duplicate their assigned materials, so editing a layer never writes back to the source
   resource on disk, and two layers assigned the same material stay independent.
 - Two layers may declare uniforms, samplers, helper functions, consts or structs with the same name;
@@ -114,4 +80,5 @@ Recorded so the next pass does not re-investigate:
 - `varying` declarations survive, including across the vertex and fragment stages.
 - Both blend paths work: texture masks via `l_mixFragment`, mask materials by writing `RESULT_*`
   straight to `finalFragment`.
-- Null entries in the `layers` array become real `MaterialLayer` instances.
+- Null entries in the `layers` array become real `MaterialLayer` instances, and an active layer with
+  no Surface Material is skipped with a warning rather than breaking the build.
