@@ -1,6 +1,6 @@
 [gd_resource type="ShaderMaterial" script_class="SurfaceMaterial" format=3 uid="uid://dyxb86tnb0dea"]
 
-[ext_resource type="Script" uid="uid://xmaw7xa28d6b" path="res://addons/materialLayers/src/surface_material.gd" id="1_5d1sq"]
+[ext_resource type="Script" uid="uid://dqnnessi3vlpd" path="res://addons/materialLayers/src/surface_material.gd" id="1_5d1sq"]
 [ext_resource type="Shader" uid="uid://bxj6gv3ecgkft" path="res://assets/shaders/baseMaterial.gdshader" id="2_xlsg1"]
 [ext_resource type="Texture2D" uid="uid://pfp5p2n75flr" path="res://assets/textures/rockyGround/rockyGround_BaseRough.dds" id="3_udm4v"]
 [ext_resource type="Texture2D" uid="uid://kces2afmpm7h" path="res://assets/textures/rockyGround/rockyGround_NormAOHeight.dds" id="4_sl17p"]
@@ -8,15 +8,15 @@
 [resource]
 render_priority = 0
 shader = ExtResource("2_xlsg1")
-shader_parameter/dispStrength = 0.14
-shader_parameter/heightOffset_d = 0.279
+shader_parameter/dispStrength = 0.04
+shader_parameter/heightOffset_d = -0.156
 shader_parameter/UVScale = 1.0
 shader_parameter/UVOffset = Vector2(0, 0)
 shader_parameter/UVRot = 0.0
 shader_parameter/pivot = Vector2(0, 0)
 shader_parameter/tint = Color(1, 1, 1, 1)
-shader_parameter/albedoBrightness = 0.0
-shader_parameter/albedoContrast = 0.0
+shader_parameter/albedoBrightness = -0.41699997230749997
+shader_parameter/albedoContrast = -0.35599996941
 shader_parameter/roughnessLevel = 0.0
 shader_parameter/roughnessContrast = 0.0
 shader_parameter/normalIntensity = 1.0
@@ -24,4 +24,3 @@ shader_parameter/aoLevel = 0.0
 shader_parameter/baseRough = ExtResource("3_udm4v")
 shader_parameter/normAOHeight = ExtResource("4_sl17p")
 script = ExtResource("1_5d1sq")
-metadata/_custom_type_script = "uid://xmaw7xa28d6b"
