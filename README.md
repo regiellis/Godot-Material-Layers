@@ -9,6 +9,10 @@
 
 Available in the [Godot Asset Store](https://store.godotengine.org/asset/foyezes/material-layers/) in editor. See all [releases](https://github.com/Foyezes/Godot-Material-Layers/releases).
 
+## Example project
+
+A working example lives in [`examples/vcol-heightblend`](examples/vcol-heightblend): rock, rocky ground and moss layers blended by height and painted vertex colors. Run `.\test\run-tests.ps1` once to sync `addons/materialLayers` into it, then open the project in Godot. The vertex paint is baked into the scene; repainting it needs the Nexus Vertex Painter addon (MIT, by Michael Kulzer), which is not bundled.
+
 ## Material Layers is a Godot plugin that lets you blend materials using a layer based system
 
 Unlike traditional materials where you have to blend desired materials in a single shader, Material Layers allows you to easily blend multiple materials in the inspector. This workflow drastically reduces time required to blend multiple materials, allowing for a more iterative and easy to use experience.

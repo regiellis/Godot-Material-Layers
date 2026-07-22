@@ -63,8 +63,9 @@ missing base layer emitting a broken shader instead of a clear error. See the gi
 
 Recorded so the next pass does not re-investigate:
 
-- The real example stack (`examples/material-layers-vcol-heightblend-example.zip`, three layers with a
-  height-blend vertex-colour mask material) compiles cleanly through every change on this branch.
+- The real example stack (`examples/vcol-heightblend/`, three layers with a height-blend
+  vertex-colour mask material) compiles cleanly through every change on this branch, and is now
+  verified on every full `run-tests.ps1` run.
 - Uniform values propagate live after `compile()` without a recompile, including a texture swap on a
   layer whose texture was shared with another layer at Generate time.
 - Layers duplicate their assigned materials, so editing a layer never writes back to the source
