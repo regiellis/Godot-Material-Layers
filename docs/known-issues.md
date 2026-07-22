@@ -4,51 +4,17 @@ Open defects in the addon. Every entry is reproduced by a failing test in `test/
 an explicit command.
 
 Status as of 2026-07-22, Godot 4.7.1-rc, addon version 0.9.0.
-Run `.\test\run-tests.ps1` to see the current state: **149 checks, 7 failing**.
+Run `.\test\run-tests.ps1` to see the current state: **171 checks, 1 failing**.
 
 Already fixed on this branch, kept here only so the list is not mistaken for the full picture:
-CRLF checkouts destroying the shader macros, helper functions failing to compile, the
-`BENT_NORMAL` token tables disagreeing, and `LAYER_BELOW_TEX_*` / `LAYER_BELOW_MASK_*` referencing
-`finalLayerData` before it was declared. See the git history for those changes.
+CRLF checkouts destroying the shader macros; helper functions failing to compile; the `BENT_NORMAL`
+token tables disagreeing; `LAYER_BELOW_TEX_*` / `LAYER_BELOW_MASK_*` referencing `finalLayerData`
+before it was declared; and the parser dropping global `const`s, `#define`s, `struct`s,
+`instance uniform`s, array uniforms and `render_mode`. See the git history for those changes.
 
 ---
 
-## 1. The parser drops most global shader constructs
-
-**Severity: high, and undocumented. Each of these silently vanishes.**
-
-The generator rebuilds the global section only from constructs it recognises: `#include`, `uniform`,
-`global uniform`, `varying`, and helper functions. Anything else in a layer shader's global scope is
-discarded, and any reference to it becomes an undeclared identifier.
-
-Confirmed dropped:
-
-| Construct | Example | Result |
-| --- | --- | --- |
-| global `const` | `const float SCALE = 2.0;` | undeclared identifier |
-| `#define` | `#define DOUBLE(x) ((x)*2.0)` | undeclared identifier |
-| `struct` | `struct Pair { float a; };` | undeclared type |
-| `instance uniform` | `instance uniform float w;` | dropped, `parse_uniforms` matches only `uniform ` |
-| `render_mode` | `render_mode unshaded;` | dropped, output is always plain `shader_type spatial;` |
-| array uniform | `uniform vec4 palette[4];` | identifier captured as `palette[4]`, then used as a regex character class |
-
-The array case is the nastiest: `parse_uniforms` takes `head_tokens[2]` as the identifier, which for
-an array is `palette[4]`, and `prefix_vertex_fragment` compiles that straight into a regex where
-`[4]` is a character class.
-
-`render_mode` is the one worth deciding first, because it is not a parser limitation so much as a
-design question: a generated shader blends N layers, and there is no obvious correct answer for
-whose `render_mode` wins.
-
-**Fix direction:** either extend the parser to carry these through, or reject them at compile time
-with a clear error. Silently dropping them is the worst option. Whichever is chosen, the README's
-authoring rules need to state what a layer shader may contain.
-
-**Tests:** `test_shader_features.gd` (6 failures).
-
----
-
-## 2. Sampler deduplication bakes in the textures present at compile time
+## 1. Sampler deduplication bakes in the textures present at compile time
 
 **Severity: medium.**
 
@@ -68,7 +34,7 @@ per-layer uniforms and dedup only the sampler *bindings*.
 
 ---
 
-## 3. A stack with no base layer emits a broken shader
+## 2. A stack with no base layer emits a broken shader
 
 **Severity: medium.**
 
@@ -87,7 +53,7 @@ result is not silently wrong; tighten it when this is fixed).
 
 ---
 
-## 4. Smaller things
+## 3. Smaller things
 
 - **Dead code.** `get_fragment_macros` and `prefix_vertex_samplers` are never called.
   `_base_layer_initialized`, `_layers_initialized` and `_compiled` are never read. `l_mixVertex` in
@@ -105,6 +71,11 @@ result is not silently wrong; tighten it when this is fixed).
 - **Helper functions cannot use layer tokens.** `LAYER_OUT_*` and friends are locals inside
   `fragment()`, so a helper referencing them does not compile. Only `fragment()` and `vertex()` bodies
   go through token substitution.
+- **A custom `light()` function is dropped** (now with a `push_warning` naming the layer). Supporting
+  it would mean deciding how N layers' light functions compose, which is the same design problem as
+  `render_mode` but harder.
+- **`group_uniforms` is silently dropped.** Cosmetic only: uniforms lose their inspector grouping,
+  and the LayerStack inspector hides shader parameters anyway.
 - **`use_as_overlay` is vestigial.** `SurfaceMaterial.use_as_overlay` only forces `mask_active = false`
   in `material_layer.gd`; nothing in code generation reads it.
 - **`plugin.cfg` declares no `compatibility_minimum`.** `FRAGMENT_OUTPUTS` writes `BENT_NORMAL_MAP`,
@@ -117,6 +88,9 @@ result is not silently wrong; tighten it when this is fixed).
   identifiers under layer N's own prefix. Benign in the common case, but an identifier that must stay
   global (one from an `#include`) is renamed and breaks if an earlier layer happened to declare the
   same name.
+- **Uniform hints and defaults are never renamed.** A uniform default referencing a layer const
+  (`uniform float x = SCALE;`) keeps the raw name and breaks; only statement bodies, helpers, consts
+  and structs go through identifier renaming.
 
 ---
 
@@ -125,13 +99,12 @@ result is not silently wrong; tighten it when this is fixed).
 Recorded so the next pass does not re-investigate:
 
 - The real example stack (`examples/material-layers-vcol-heightblend-example.zip`, three layers with a
-  height-blend vertex-colour mask material) compiles cleanly, and its generated shader is byte
-  identical before and after the fixes on this branch once line endings are ignored.
+  height-blend vertex-colour mask material) compiles cleanly through every change on this branch.
 - Uniform values propagate live after `compile()` without a recompile.
 - Layers duplicate their assigned materials, so editing a layer never writes back to the source
   resource on disk, and two layers assigned the same material stay independent.
-- Two layers may declare uniforms, samplers, or helper functions with the same name; namespacing
-  handles it.
+- Two layers may declare uniforms, samplers, helper functions, consts or structs with the same name;
+  namespacing handles all of them, including struct-typed locals sharing a name across layers.
 - Statements that write built-in outputs (`ALBEDO = ...`) are stripped correctly. A local whose name
   merely *starts* with an output name (`AOamount`, `EMISSIONtint`) survives, because the statement
   text begins with its type. A bare reassignment such as `AOamount = 1.0;` on its own line is still

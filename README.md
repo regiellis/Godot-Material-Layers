@@ -1,5 +1,10 @@
 [<img target="_newtab" src="assets/materialLayerHeader3.webp">](https://store.godotengine.org)
 
+> [!WARNING]
+> This fork diverges heavily from [Foyezes/Godot-Material-Layers](https://github.com/Foyezes/Godot-Material-Layers).
+> Changes here follow the maintainer's personal taste and are not coordinated with upstream.
+> For the original plugin, use the upstream repository and its Asset Store releases.
+
 ## Download
 
 Available in the [Godot Asset Store](https://store.godotengine.org/asset/foyezes/material-layers/) in editor. See all [releases](https://github.com/Foyezes/Godot-Material-Layers/releases).
@@ -128,6 +133,16 @@ void fragment() {
 ```
 
 Both `SurfaceMaterial` and `MaskMaterial` must have the `#include` at the top, and `SETUP_LAYER_FRAGMENT` at the top of fragment shader and `SETUP_LAYER_VERTEX` at the top of vertex shader.
+
+### Layer shader rules
+
+`LayerStack` merges every layer's shader into one, renaming each layer's identifiers so they cannot collide. That gives you a few rules:
+
+- Uniforms, samplers, varyings, global `const`s, `struct`s and helper functions are carried over per layer. Two layers can reuse the same names freely.
+- `instance uniform` works, but the merged shader exposes it under the generated name (`s_layer_<n>_<name>`) on the mesh instance.
+- `#define` macros are shared across the whole stack. Redefining a name with a different body is an error, and the first definition wins.
+- `render_mode` is taken from the base layer only. Render modes on other layers are ignored with a warning.
+- A custom `light()` function is not supported and is ignored.
 
 ### Blending Two SurfaceMaterials
 
