@@ -1,39 +1,19 @@
-[gd_resource type="ShaderMaterial" script_class="LayerStack" format=3 uid="uid://6ap8ydx2btpp"]
+[gd_resource type="ShaderMaterial" script_class="LayerStack" format=3]
 
-[ext_resource type="Script" uid="uid://6sujpy7tpc64" path="res://addons/materialLayers/src/material_layer.gd" id="2_65gih"]
-[ext_resource type="Texture2D" uid="uid://jmpgvql4mbyi" path="res://assets/textures/rock/rock_baseRough.dds" id="3_51bgu"]
-[ext_resource type="Script" uid="uid://4evdsqc5p8c0" path="res://addons/materialLayers/src/mask_material.gd" id="3_ywqvq"]
-[ext_resource type="Shader" uid="uid://b63svgoiy3dv6" path="res://assets/shaders/heightBlendVertexColorsLayer.gdshader" id="4_6wgmd"]
-[ext_resource type="Texture2D" uid="uid://1si5oynng43t" path="res://assets/textures/rock/rock_normAOHeight.dds" id="4_65wpu"]
-[ext_resource type="Script" uid="uid://xmaw7xa28d6b" path="res://addons/materialLayers/src/surface_material.gd" id="5_yh4s2"]
-[ext_resource type="Shader" uid="uid://bxj6gv3ecgkft" path="res://assets/shaders/baseMaterial.gdshader" id="6_yhfsj"]
-[ext_resource type="Texture2D" uid="uid://pfp5p2n75flr" path="res://assets/textures/rockyGround/rockyGround_BaseRough.dds" id="8_psm1d"]
-[ext_resource type="Texture2D" uid="uid://kces2afmpm7h" path="res://assets/textures/rockyGround/rockyGround_NormAOHeight.dds" id="9_pi7h7"]
-[ext_resource type="Texture2D" uid="uid://0pn2nfo6fawh" path="res://assets/textures/moss/moss_A_BaseRough.dds" id="10_65gih"]
-[ext_resource type="Script" uid="uid://c4poekual5gov" path="res://addons/materialLayers/src/layer_stack.gd" id="11_ut74i"]
-[ext_resource type="Texture2D" uid="uid://c67pwi06ngrg8" path="res://assets/textures/moss/moss_A_NormAOHeight.dds" id="11_ywqvq"]
-[ext_resource type="Shader" uid="uid://b2ol34p8qqs7c" path="res://assets/shaders/rockGroundMossStack.gdshader" id="12_s7cpd"]
-
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_6wgmd"]
-render_priority = 0
-shader = ExtResource("6_yhfsj")
-shader_parameter/dispStrength = 0.265
-shader_parameter/heightOffset_d = 0.5
-shader_parameter/UVScale = 1.0
-shader_parameter/UVOffset = Vector2(0, 0)
-shader_parameter/UVRot = 0.0
-shader_parameter/pivot = Vector2(0, 0)
-shader_parameter/tint = Color(1, 1, 1, 1)
-shader_parameter/albedoBrightness = 0.0
-shader_parameter/albedoContrast = 0.10400005244
-shader_parameter/roughnessLevel = 0.0
-shader_parameter/roughnessContrast = 0.0
-shader_parameter/normalIntensity = 1.0
-shader_parameter/aoLevel = 0.0
-shader_parameter/baseRough = ExtResource("3_51bgu")
-shader_parameter/normAOHeight = ExtResource("4_65wpu")
-script = ExtResource("5_yh4s2")
-metadata/_custom_type_script = "uid://xmaw7xa28d6b"
+[ext_resource type="Material" path="res://assets/materialLayers/surfaceMaterials/rockLayer.tres" id="1_pi7h7"]
+[ext_resource type="Script" path="res://addons/materialLayers/src/material_layer.gd" id="2_65gih"]
+[ext_resource type="Texture2D" path="res://assets/textures/rock/rock_baseRough.dds" id="3_51bgu"]
+[ext_resource type="Script" path="res://addons/materialLayers/src/mask_material.gd" id="3_ywqvq"]
+[ext_resource type="Shader" path="res://assets/shaders/heightBlendVertexColorsLayer.gdshader" id="4_6wgmd"]
+[ext_resource type="Texture2D" path="res://assets/textures/rock/rock_normAOHeight.dds" id="4_65wpu"]
+[ext_resource type="Material" path="res://assets/materialLayers/surfaceMaterials/rockyGroundLayer.tres" id="5_65gih"]
+[ext_resource type="Material" path="res://assets/materialLayers/surfaceMaterials/mossLayer.tres" id="6_ywqvq"]
+[ext_resource type="Texture2D" path="res://assets/textures/rockyGround/rockyGround_BaseRough.dds" id="8_psm1d"]
+[ext_resource type="Texture2D" path="res://assets/textures/rockyGround/rockyGround_NormAOHeight.dds" id="9_pi7h7"]
+[ext_resource type="Texture2D" path="res://assets/textures/moss/moss_A_BaseRough.dds" id="10_65gih"]
+[ext_resource type="Script" path="res://addons/materialLayers/src/layer_stack.gd" id="11_ut74i"]
+[ext_resource type="Texture2D" path="res://assets/textures/moss/moss_A_NormAOHeight.dds" id="11_ywqvq"]
+[ext_resource type="Shader" path="res://assets/shaders/rockGroundMossStack.gdshader" id="12_s7cpd"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_ua4bn"]
 render_priority = 0
@@ -45,32 +25,11 @@ shader_parameter/invertHeight = true
 script = ExtResource("3_ywqvq")
 metadata/_custom_type_script = "uid://4evdsqc5p8c0"
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_yh4s2"]
-render_priority = 0
-shader = ExtResource("6_yhfsj")
-shader_parameter/dispStrength = 0.14
-shader_parameter/heightOffset_d = 0.279
-shader_parameter/UVScale = 1.0
-shader_parameter/UVOffset = Vector2(0, 0)
-shader_parameter/UVRot = 0.0
-shader_parameter/pivot = Vector2(0, 0)
-shader_parameter/tint = Color(1, 1, 1, 1)
-shader_parameter/albedoBrightness = 0.0
-shader_parameter/albedoContrast = 0.0
-shader_parameter/roughnessLevel = 0.0
-shader_parameter/roughnessContrast = 0.0
-shader_parameter/normalIntensity = 1.0
-shader_parameter/aoLevel = 0.0
-shader_parameter/baseRough = ExtResource("8_psm1d")
-shader_parameter/normAOHeight = ExtResource("9_pi7h7")
-script = ExtResource("5_yh4s2")
-metadata/_custom_type_script = "uid://xmaw7xa28d6b"
-
 [sub_resource type="Resource" id="Resource_xe8pq"]
 resource_name = "RockyGround"
 script = ExtResource("2_65gih")
 label = "RockyGround"
-surface_material = SubResource("ShaderMaterial_yh4s2")
+surface_material = ExtResource("5_65gih")
 mask_material = SubResource("ShaderMaterial_ua4bn")
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_ywqvq"]
@@ -83,32 +42,11 @@ shader_parameter/invertHeight = true
 script = ExtResource("3_ywqvq")
 metadata/_custom_type_script = "uid://4evdsqc5p8c0"
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_yhfsj"]
-render_priority = 0
-shader = ExtResource("6_yhfsj")
-shader_parameter/dispStrength = 0.0
-shader_parameter/heightOffset_d = 0.5
-shader_parameter/UVScale = 2.0
-shader_parameter/UVOffset = Vector2(0, 0)
-shader_parameter/UVRot = 0.0
-shader_parameter/pivot = Vector2(0, 0)
-shader_parameter/tint = Color(1, 1, 1, 1)
-shader_parameter/albedoBrightness = 0.0
-shader_parameter/albedoContrast = 0.0
-shader_parameter/roughnessLevel = 0.0
-shader_parameter/roughnessContrast = 0.0
-shader_parameter/normalIntensity = 1.0
-shader_parameter/aoLevel = 0.0
-shader_parameter/baseRough = ExtResource("10_65gih")
-shader_parameter/normAOHeight = ExtResource("11_ywqvq")
-script = ExtResource("5_yh4s2")
-metadata/_custom_type_script = "uid://xmaw7xa28d6b"
-
 [sub_resource type="Resource" id="Resource_nmmso"]
 resource_name = "Moss"
 script = ExtResource("2_65gih")
 label = "Moss"
-surface_material = SubResource("ShaderMaterial_yhfsj")
+surface_material = ExtResource("6_ywqvq")
 mask_material = SubResource("ShaderMaterial_ywqvq")
 
 [resource]
@@ -169,6 +107,6 @@ shader_parameter/s_layer_1_normAOHeight = ExtResource("9_pi7h7")
 shader_parameter/s_layer_2_baseRough = ExtResource("10_65gih")
 shader_parameter/s_layer_2_normAOHeight = ExtResource("11_ywqvq")
 script = ExtResource("11_ut74i")
-base_layer = SubResource("ShaderMaterial_6wgmd")
+base_layer = ExtResource("1_pi7h7")
 layers = Array[ExtResource("2_65gih")]([SubResource("Resource_xe8pq"), SubResource("Resource_nmmso")])
 metadata/_custom_type_script = "uid://c4poekual5gov"

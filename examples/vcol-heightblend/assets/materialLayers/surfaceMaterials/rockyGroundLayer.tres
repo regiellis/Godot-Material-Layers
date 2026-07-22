@@ -8,8 +8,8 @@
 [resource]
 render_priority = 0
 shader = ExtResource("2_xlsg1")
-shader_parameter/dispStrength = 0.0
-shader_parameter/heightOffset_d = 0.5
+shader_parameter/dispStrength = 0.14
+shader_parameter/heightOffset_d = 0.279
 shader_parameter/UVScale = 1.0
 shader_parameter/UVOffset = Vector2(0, 0)
 shader_parameter/UVRot = 0.0
