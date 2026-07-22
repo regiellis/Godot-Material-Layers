@@ -528,7 +528,7 @@ func parse_uniforms(shader: String, is_mask: bool, index: int) -> Dictionary:
 
 	for word in surface_c.split(";"):
 		var line = word.strip_edges()
-		if not line.begins_with("uniform "):
+		if not (line.begins_with("uniform ") or line.begins_with("instance uniform ")):
 			continue
 		uniforms.append(line)
 
@@ -540,28 +540,31 @@ func parse_uniforms(shader: String, is_mask: bool, index: int) -> Dictionary:
 			tail = " :" + colon_parts[1]
 
 		var head_tokens: Array = head.split(" ", false)
-		var type: String = head_tokens[1]
+		# "instance uniform" shifts the type and identifier one token right.
+		var type_at := 2 if head_tokens[0] == "instance" else 1
+		var type: String = head_tokens[type_at]
+		# Arrays declare their size on the type ("vec4[4] palette") or on the
+		# identifier ("palette[4]"); the bare name is what gets namespaced.
+		var type_name := type.get_slice("[", 0)
 
-		if type == "sampler2D" or type == "sampler2DArray":
-			var sampler_id: String = head_tokens[2]
-			var prefixed_sampler_id := prefix + sampler_id
+		var id_token: String = head_tokens[type_at + 1]
+		var id_end := id_token.length()
+		for delim in ["[", "="]:
+			var pos: int = id_token.find(delim)
+			if pos != -1 and pos < id_end:
+				id_end = pos
+		var identifier := id_token.substr(0, id_end)
+		head_tokens[type_at + 1] = prefix + identifier + id_token.substr(id_end)
+		var new_head := " ".join(head_tokens)
 
-			head_tokens[2] = prefixed_sampler_id
-			var new_sampler_head := " ".join(head_tokens)
-
-			sampler_identifiers.append(sampler_id)
-			prefixed_samplers.append(new_sampler_head + tail  + ";")
+		if type_name == "sampler2D" or type_name == "sampler2DArray":
+			sampler_identifiers.append(identifier)
+			prefixed_samplers.append(new_head + tail  + ";")
 			
 			continue
 		
-		var uniform_id: String = head_tokens[2]
-		var prefixed_uniform_id := prefix + uniform_id
-
-		head_tokens[2] = prefixed_uniform_id
-		var new_uniform_head := " ".join(head_tokens)
-
-		uniform_identifiers.append(uniform_id)
-		prefixed_uniforms.append(new_uniform_head + tail  + ";")
+		uniform_identifiers.append(identifier)
+		prefixed_uniforms.append(new_head + tail  + ";")
 
 		
 

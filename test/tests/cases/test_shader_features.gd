@@ -63,7 +63,7 @@ func test_render_mode_is_dropped() -> void:
 	check_contains(code, "render_mode", "render_mode reaches the generated shader")
 
 
-func test_instance_uniform_is_dropped() -> void:
+func test_instance_uniform_survives() -> void:
 	var code := _gen("uniform float value = 1.0;\ninstance uniform float perInstance = 0.0;\n", """
 void fragment() {
 	SETUP_LAYER_FRAGMENT;
@@ -71,10 +71,12 @@ void fragment() {
 	ALBEDO = LAYER_OUT_ALBEDO;
 }
 """)
+	check_contains(code, "instance uniform float s_layer_0_perInstance",
+		"instance uniform is carried over and namespaced")
 	check_compiles(code, "a layer shader may declare an instance uniform")
 
 
-func test_array_uniform() -> void:
+func test_array_uniform_survives() -> void:
 	var code := _gen("uniform float value = 1.0;\nuniform vec4 palette[4];\n", """
 void fragment() {
 	SETUP_LAYER_FRAGMENT;
@@ -82,6 +84,8 @@ void fragment() {
 	ALBEDO = LAYER_OUT_ALBEDO;
 }
 """)
+	check_contains(code, "uniform vec4 s_layer_0_palette[4]",
+		"array uniform keeps its size and gets namespaced")
 	check_compiles(code, "a layer shader may declare an array uniform")
 
 
