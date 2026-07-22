@@ -1332,34 +1332,6 @@ func prefix_vertex_fragment(body: String, identifiers: Array, is_mask: bool, ind
 	return result
 
 
-func prefix_vertex_fragment_samplers(all_fragment_funcs: Array, originals: Array, renames: Array) -> Array:
-	var result := []
-	var body := ""
-	for fragment in all_fragment_funcs:
-		body = fragment
-		for i in originals.size():
-			var regex := RegEx.new()
-			regex.compile("\\b" + originals[i] + "\\b")
-			body = regex.sub(body, renames[i], true)
-		result.append(body)
-	
-	return result
-
-
-func prefix_vertex_samplers(all_vertex_funcs: Array, originals: Array, renames: Array) -> Array:
-	var result := []
-	var body := ""
-	for vertex in all_vertex_funcs:
-		body = vertex
-		for i in originals.size():
-			var regex := RegEx.new()
-			regex.compile("\\b" + originals[i] + "\\b")
-			body = regex.sub(body, renames[i], true)
-		result.append(body)
-	
-	return result
-
-
 ## Namespaces the uniforms and samplers that a helper function body references.
 ## The function names themselves are already prefixed by parse_helper_funcs();
 ## this pass is what stops a helper reading an unprefixed uniform.
@@ -1487,55 +1459,6 @@ func flatten_statements(statements: Array) -> String:
 	result = result.indent("\t")
 	return result
 
-
-func dedup_samplers(layer_uniform_maps: Array):
-	var sampler_rid_map := {}
-	var originals := []
-	var renames := []
-	var uniforms := []
-	var _to_remove := []
-
-	for layer in layer_uniform_maps:
-		var original: ShaderMaterial
-		if layer.has("surface_material"):
-			original = layer["surface_material"]
-		elif layer.has("mask_material"):
-			original = layer["mask_material"]
-		else:
-			continue
-		var identifiers: Array = layer["sampler_identifiers"]
-		var prefix := "s_layer_%d_" % layer["index"]
-		if layer.get("is_mask", false):
-			prefix = "m_layer_%d_" % layer["index"]
-		uniforms.append_array(layer["sampler_uniforms"])
-
-		for old_name in identifiers:
-			var new_name : String = prefix + old_name
-			var value = original.get_shader_parameter(old_name)
-
-			if value != null:
-				sampler_rid_map[new_name] = {"rid": value.get_rid(), "identifier": old_name}
-	
-	var first_seen := {}
-	
-	for uniform_name in sampler_rid_map:
-		var rid: RID = sampler_rid_map[uniform_name]["rid"]
-		var identifier: String = sampler_rid_map[uniform_name]["identifier"]
-		if first_seen.has(rid):
-			originals.append(uniform_name)
-			renames.append(first_seen[rid])
-			for uniform in uniforms:
-				if uniform.contains(uniform_name):
-					_to_remove.append(uniform)
-					break
-		else:
-			first_seen[rid] = uniform_name
-	
-	for uniform in _to_remove:
-		uniforms.erase(uniform)
-
-	return {"sampler_uniforms": uniforms, "originals": originals, "renames": renames}
-			
 
 func set_mask_uniforms(assets: Array):
 	for asset in assets:
@@ -1844,13 +1767,12 @@ func _generate_code(assets: Array) -> String:
 		all_vertex_funcs.append("\n")
 	
 
-	var deduped_samplers = dedup_samplers(layer_uniform_maps)
-	
-	all_uniforms.append_array(deduped_samplers["sampler_uniforms"])
-
-	all_fragment_funcs = prefix_vertex_fragment_samplers(all_fragment_funcs, deduped_samplers["originals"], deduped_samplers["renames"])
-	all_vertex_funcs = prefix_vertex_fragment_samplers(all_vertex_funcs, deduped_samplers["originals"], deduped_samplers["renames"])
-	all_helper_funcs = prefix_vertex_fragment_samplers(all_helper_funcs, deduped_samplers["originals"], deduped_samplers["renames"])
+	# Every layer keeps its own sampler uniforms. Folding layers that point at
+	# the same texture onto one shared uniform bakes that compile-time snapshot
+	# into the shader: reassigning either layer's texture afterwards would have
+	# no uniform left to receive it.
+	for layer in layer_uniform_maps:
+		all_uniforms.append_array(layer["sampler_uniforms"])
 	mega_shader.append("shader_type spatial;")
 	if not all_render_modes.is_empty():
 		mega_shader.append("\n" + "\n".join(all_render_modes))

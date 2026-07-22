@@ -111,7 +111,7 @@ func test_distinct_textures_stay_distinct() -> void:
 	check_contains(code, "uniform sampler2D s_layer_1_albedoTex", "layer 1 sampler exists")
 
 
-func test_shared_texture_is_deduplicated() -> void:
+func test_shared_texture_layers_keep_their_own_samplers() -> void:
 	var shared_tex := _tex(Color.BLUE)
 
 	var base := surface(TEXTURED)
@@ -125,14 +125,20 @@ func test_shared_texture_is_deduplicated() -> void:
 	stack.compile()
 
 	var code: String = stack.shader.code
-	check_compiles(code, "deduplicated samplers compile")
+	check_contains(code, "uniform sampler2D s_layer_0_albedoTex", "layer 0 keeps its sampler")
+	check_contains(code, "uniform sampler2D s_layer_1_albedoTex",
+		"layer 1 keeps its own sampler even when the texture is shared")
+	check_compiles(code, "a shared-texture stack compiles")
 
-	# After dedup, swapping layer 1's texture must still be expressible.
+	# The point of per-layer samplers: a texture swap after Generate must
+	# propagate without a recompile.
 	var other := _tex(Color.WHITE)
 	top.surface_material.set_shader_parameter("albedoTex", other)
-	var has_own_uniform := code.contains("uniform sampler2D s_layer_1_albedoTex")
-	check(has_own_uniform,
-		"layer 1 keeps its own sampler so its texture can change without a recompile")
+	top.surface_material.emit_changed()
+	check(stack.get_shader_parameter("s_layer_1_albedoTex") == other,
+		"the swapped texture reaches the stack without a recompile")
+	check(stack.get_shader_parameter("s_layer_0_albedoTex") == shared_tex,
+		"the other layer keeps the original texture")
 
 
 func test_null_layer_entry_becomes_a_real_layer() -> void:
