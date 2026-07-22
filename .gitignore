@@ -3,3 +3,9 @@
 # Test project: addons/ is a generated copy of ../addon, .godot is Godot's cache.
 test/addons/
 test/.godot/
+
+# Personal agent tooling, kept out of the fork's history.
+.claude/
+.warden/
+KARA.md
+KIKO.md
