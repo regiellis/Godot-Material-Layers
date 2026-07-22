@@ -14,11 +14,10 @@ var _layers_initialized := false
 var _compiled := false
 
 ## [img width=32]res://addons/materialLayers/icons/surfaceMaterial.svg[/img]
-## Base layer
+## Base layer. Stored by reference: editing the assigned material asset
+## updates the stack live. For a per-stack copy, use Godot's own Make Unique.
 @export var base_layer: SurfaceMaterial:
 	set(val):
-		if val:
-			val = val.duplicate()
 		if base_layer and base_layer.changed.is_connected(_on_uniform_changed):
 			base_layer.changed.disconnect(_on_uniform_changed)
 		base_layer = val

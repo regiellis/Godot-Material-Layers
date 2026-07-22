@@ -8,9 +8,6 @@ extends Resource
 signal material_replaced
 signal mask_updated
 
-var _setting_surface := false
-var _setting_mask := false
-
 @export var label: String = "Layer":
 	set(val):
 		label = val
@@ -20,18 +17,13 @@ var _setting_mask := false
 		active = val
 		emit_changed()
     
+## Stored by reference: editing the assigned material asset updates every
+## stack that uses it. For a per-stack copy, use Godot's own Make Unique.
 @export var surface_material: ShaderMaterial:
 	set(val):
-		if _setting_surface:
-			surface_material = val
-			return
-		_setting_surface = true
-		surface_material = val.duplicate(false) if val else null
-		if surface_material:
-			surface_material.resource_path = ""
-		if surface_material and surface_material.use_as_overlay:
+		surface_material = val
+		if surface_material and surface_material.get("use_as_overlay"):
 			mask_active = false
-		_setting_surface = false
 		material_replaced.emit()
 		emit_changed()
 
@@ -64,16 +56,10 @@ enum TextureChannel { RED, GREEN, BLUE, ALPHA }
 		mask_updated.emit()
 		emit_changed()
 
+## Stored by reference, like surface_material.
 @export var mask_material: ShaderMaterial:
 	set(val):
-		if _setting_mask:
-			mask_material = val
-			return
-		_setting_mask = true
-		mask_material = val.duplicate(false) if val else null
-		if mask_material:
-			mask_material.resource_path = ""
-		_setting_mask = false
+		mask_material = val
 		material_replaced.emit()
 		emit_changed()
 

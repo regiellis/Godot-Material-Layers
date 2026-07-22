@@ -68,8 +68,10 @@ Recorded so the next pass does not re-investigate:
   verified on every full `run-tests.ps1` run.
 - Uniform values propagate live after `compile()` without a recompile, including a texture swap on a
   layer whose texture was shared with another layer at Generate time.
-- Layers duplicate their assigned materials, so editing a layer never writes back to the source
-  resource on disk, and two layers assigned the same material stay independent.
+- Layers reference their assigned materials (live-link, a deliberate fork change): editing the
+  asset updates every stack using it, and Godot's Make Unique gives a per-stack copy when wanted.
+  Stacks saved under the old duplicate-on-assign design still load; their embedded copies simply
+  have no `resource_path`.
 - Two layers may declare uniforms, samplers, helper functions, consts or structs with the same name;
   namespacing handles all of them, including struct-typed locals sharing a name across layers.
 - Statements that write built-in outputs (`ALBEDO = ...`) are stripped correctly. A local whose name

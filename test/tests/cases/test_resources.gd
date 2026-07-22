@@ -26,7 +26,7 @@ static func _tex(c: Color) -> Texture2D:
 	return ImageTexture.create_from_image(img)
 
 
-func test_layer_duplicates_its_surface_material() -> void:
+func test_layer_references_its_surface_material() -> void:
 	var shared := surface(TEXTURED)
 	shared.set_shader_parameter("tint", Vector3(1, 0, 0))
 
@@ -35,21 +35,42 @@ func test_layer_duplicates_its_surface_material() -> void:
 	a.surface_material = shared
 	b.surface_material = shared
 
-	check(a.surface_material != shared, "layer stores a copy, not the assigned resource")
-	check(a.surface_material != b.surface_material, "two layers get independent copies")
+	check(a.surface_material == shared, "the layer stores the material it was given")
+	check(b.surface_material == shared, "two layers may share one material")
 
-	a.surface_material.set_shader_parameter("tint", Vector3(0, 1, 0))
-	check_eq(b.surface_material.get_shader_parameter("tint"), Vector3(1, 0, 0),
-		"editing one layer does not touch another")
-	check_eq(shared.get_shader_parameter("tint"), Vector3(1, 0, 0),
-		"editing a layer does not write back to the source material")
+	shared.set_shader_parameter("tint", Vector3(0, 1, 0))
+	check_eq(a.surface_material.get_shader_parameter("tint"), Vector3(0, 1, 0),
+		"editing the source material is visible through the layer")
 
 
-func test_stack_duplicates_its_base_layer() -> void:
+func test_stack_references_its_base_layer() -> void:
 	var shared := surface(TEXTURED)
 	var stack := LayerStack.new()
 	stack.base_layer = shared
-	check(stack.base_layer != shared, "base layer is copied on assign")
+	check(stack.base_layer == shared, "the stack stores the material it was given")
+
+
+func test_editing_the_source_material_updates_the_stack() -> void:
+	# The live-link contract: layers reference the material asset, so editing
+	# the asset itself drives the generated material. Per-stack uniqueness is
+	# Godot's own Make Unique, not an implicit duplicate.
+	var source := surface(TEXTURED)
+	source.set_shader_parameter("tint", Vector3(1, 0, 0))
+
+	var layer := texture_masked_layer(TEXTURED)
+	layer.surface_material = source
+
+	var stack := LayerStack.new()
+	stack.base_layer = surface(TEXTURED)
+	stack.layers = [layer] as Array[MaterialLayer]
+	stack.compile()
+	check_eq(stack.get_shader_parameter("s_layer_1_tint"), Vector3(1, 0, 0),
+		"compile picks up the source material's values")
+
+	source.set_shader_parameter("tint", Vector3(0, 0, 1))
+	source.emit_changed()
+	check_eq(stack.get_shader_parameter("s_layer_1_tint"), Vector3(0, 0, 1),
+		"editing the source material updates the stack live")
 
 
 func test_uniform_values_reach_the_generated_material() -> void:
