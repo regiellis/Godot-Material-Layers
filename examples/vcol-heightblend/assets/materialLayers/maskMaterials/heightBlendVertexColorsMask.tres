@@ -1,0 +1,14 @@
+[gd_resource type="ShaderMaterial" script_class="MaskMaterial" format=3 uid="uid://bbo55dvk8dt6f"]
+
+[ext_resource type="Script" uid="uid://4evdsqc5p8c0" path="res://addons/materialLayers/src/mask_material.gd" id="1_ajeqy"]
+[ext_resource type="Shader" uid="uid://b63svgoiy3dv6" path="res://assets/shaders/heightBlendVertexColorsLayer.gdshader" id="2_vkacr"]
+
+[resource]
+render_priority = 0
+shader = ExtResource("2_vkacr")
+shader_parameter/vertexColor = 0
+shader_parameter/heightOffset = 0.50000002375
+shader_parameter/heightContrast = 0.2
+shader_parameter/invertHeight = true
+script = ExtResource("1_ajeqy")
+metadata/_custom_type_script = "uid://4evdsqc5p8c0"

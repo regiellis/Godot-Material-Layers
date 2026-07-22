@@ -1,8 +1,15 @@
 *.uid
+# The example project ships its .uid sidecars so resource references resolve,
+# matching how upstream distributed the example zip.
+!examples/**/*.uid
 
 # Test project: addons/ is a generated copy of ../addon, .godot is Godot's cache.
 test/addons/
 test/.godot/
+
+# Example project: addons/ is synced from ../../addon by test/run-tests.ps1.
+examples/vcol-heightblend/addons/
+examples/vcol-heightblend/.godot/
 
 # Personal agent tooling, kept out of the fork's history.
 .claude/

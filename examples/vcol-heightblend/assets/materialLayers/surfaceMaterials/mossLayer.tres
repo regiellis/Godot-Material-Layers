@@ -1,0 +1,27 @@
+[gd_resource type="ShaderMaterial" script_class="SurfaceMaterial" format=3 uid="uid://d2lkpdloamh51"]
+
+[ext_resource type="Script" uid="uid://xmaw7xa28d6b" path="res://addons/materialLayers/src/surface_material.gd" id="1_h1n43"]
+[ext_resource type="Shader" uid="uid://bxj6gv3ecgkft" path="res://assets/shaders/baseMaterial.gdshader" id="2_opn1b"]
+[ext_resource type="Texture2D" uid="uid://0pn2nfo6fawh" path="res://assets/textures/moss/moss_A_BaseRough.dds" id="3_k60hy"]
+[ext_resource type="Texture2D" uid="uid://c67pwi06ngrg8" path="res://assets/textures/moss/moss_A_NormAOHeight.dds" id="4_stx6b"]
+
+[resource]
+render_priority = 0
+shader = ExtResource("2_opn1b")
+shader_parameter/dispStrength = 0.0
+shader_parameter/heightOffset_d = 0.5
+shader_parameter/UVScale = 2.0
+shader_parameter/UVOffset = Vector2(0, 0)
+shader_parameter/UVRot = 0.0
+shader_parameter/pivot = Vector2(0, 0)
+shader_parameter/tint = Color(1, 1, 1, 1)
+shader_parameter/albedoBrightness = 0.0
+shader_parameter/albedoContrast = 0.0
+shader_parameter/roughnessLevel = 0.0
+shader_parameter/roughnessContrast = 0.0
+shader_parameter/normalIntensity = 1.0
+shader_parameter/aoLevel = 0.0
+shader_parameter/baseRough = ExtResource("3_k60hy")
+shader_parameter/normAOHeight = ExtResource("4_stx6b")
+script = ExtResource("1_h1n43")
+metadata/_custom_type_script = "uid://xmaw7xa28d6b"

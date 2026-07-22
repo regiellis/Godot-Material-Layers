@@ -1,0 +1,174 @@
+[gd_resource type="ShaderMaterial" script_class="LayerStack" format=3 uid="uid://6ap8ydx2btpp"]
+
+[ext_resource type="Script" uid="uid://6sujpy7tpc64" path="res://addons/materialLayers/src/material_layer.gd" id="2_65gih"]
+[ext_resource type="Texture2D" uid="uid://jmpgvql4mbyi" path="res://assets/textures/rock/rock_baseRough.dds" id="3_51bgu"]
+[ext_resource type="Script" uid="uid://4evdsqc5p8c0" path="res://addons/materialLayers/src/mask_material.gd" id="3_ywqvq"]
+[ext_resource type="Shader" uid="uid://b63svgoiy3dv6" path="res://assets/shaders/heightBlendVertexColorsLayer.gdshader" id="4_6wgmd"]
+[ext_resource type="Texture2D" uid="uid://1si5oynng43t" path="res://assets/textures/rock/rock_normAOHeight.dds" id="4_65wpu"]
+[ext_resource type="Script" uid="uid://xmaw7xa28d6b" path="res://addons/materialLayers/src/surface_material.gd" id="5_yh4s2"]
+[ext_resource type="Shader" uid="uid://bxj6gv3ecgkft" path="res://assets/shaders/baseMaterial.gdshader" id="6_yhfsj"]
+[ext_resource type="Texture2D" uid="uid://pfp5p2n75flr" path="res://assets/textures/rockyGround/rockyGround_BaseRough.dds" id="8_psm1d"]
+[ext_resource type="Texture2D" uid="uid://kces2afmpm7h" path="res://assets/textures/rockyGround/rockyGround_NormAOHeight.dds" id="9_pi7h7"]
+[ext_resource type="Texture2D" uid="uid://0pn2nfo6fawh" path="res://assets/textures/moss/moss_A_BaseRough.dds" id="10_65gih"]
+[ext_resource type="Script" uid="uid://c4poekual5gov" path="res://addons/materialLayers/src/layer_stack.gd" id="11_ut74i"]
+[ext_resource type="Texture2D" uid="uid://c67pwi06ngrg8" path="res://assets/textures/moss/moss_A_NormAOHeight.dds" id="11_ywqvq"]
+[ext_resource type="Shader" uid="uid://b2ol34p8qqs7c" path="res://assets/shaders/rockGroundMossStack.gdshader" id="12_s7cpd"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_6wgmd"]
+render_priority = 0
+shader = ExtResource("6_yhfsj")
+shader_parameter/dispStrength = 0.265
+shader_parameter/heightOffset_d = 0.5
+shader_parameter/UVScale = 1.0
+shader_parameter/UVOffset = Vector2(0, 0)
+shader_parameter/UVRot = 0.0
+shader_parameter/pivot = Vector2(0, 0)
+shader_parameter/tint = Color(1, 1, 1, 1)
+shader_parameter/albedoBrightness = 0.0
+shader_parameter/albedoContrast = 0.10400005244
+shader_parameter/roughnessLevel = 0.0
+shader_parameter/roughnessContrast = 0.0
+shader_parameter/normalIntensity = 1.0
+shader_parameter/aoLevel = 0.0
+shader_parameter/baseRough = ExtResource("3_51bgu")
+shader_parameter/normAOHeight = ExtResource("4_65wpu")
+script = ExtResource("5_yh4s2")
+metadata/_custom_type_script = "uid://xmaw7xa28d6b"
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_ua4bn"]
+render_priority = 0
+shader = ExtResource("4_6wgmd")
+shader_parameter/vertexColor = 0
+shader_parameter/heightOffset = 0.7310000347225
+shader_parameter/heightContrast = 0.3030000143925
+shader_parameter/invertHeight = true
+script = ExtResource("3_ywqvq")
+metadata/_custom_type_script = "uid://4evdsqc5p8c0"
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_yh4s2"]
+render_priority = 0
+shader = ExtResource("6_yhfsj")
+shader_parameter/dispStrength = 0.14
+shader_parameter/heightOffset_d = 0.279
+shader_parameter/UVScale = 1.0
+shader_parameter/UVOffset = Vector2(0, 0)
+shader_parameter/UVRot = 0.0
+shader_parameter/pivot = Vector2(0, 0)
+shader_parameter/tint = Color(1, 1, 1, 1)
+shader_parameter/albedoBrightness = 0.0
+shader_parameter/albedoContrast = 0.0
+shader_parameter/roughnessLevel = 0.0
+shader_parameter/roughnessContrast = 0.0
+shader_parameter/normalIntensity = 1.0
+shader_parameter/aoLevel = 0.0
+shader_parameter/baseRough = ExtResource("8_psm1d")
+shader_parameter/normAOHeight = ExtResource("9_pi7h7")
+script = ExtResource("5_yh4s2")
+metadata/_custom_type_script = "uid://xmaw7xa28d6b"
+
+[sub_resource type="Resource" id="Resource_xe8pq"]
+resource_name = "RockyGround"
+script = ExtResource("2_65gih")
+label = "RockyGround"
+surface_material = SubResource("ShaderMaterial_yh4s2")
+mask_material = SubResource("ShaderMaterial_ua4bn")
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_ywqvq"]
+render_priority = 0
+shader = ExtResource("4_6wgmd")
+shader_parameter/vertexColor = 1
+shader_parameter/heightOffset = 0.6470000307325
+shader_parameter/heightContrast = 0.0870000041325
+shader_parameter/invertHeight = true
+script = ExtResource("3_ywqvq")
+metadata/_custom_type_script = "uid://4evdsqc5p8c0"
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_yhfsj"]
+render_priority = 0
+shader = ExtResource("6_yhfsj")
+shader_parameter/dispStrength = 0.0
+shader_parameter/heightOffset_d = 0.5
+shader_parameter/UVScale = 2.0
+shader_parameter/UVOffset = Vector2(0, 0)
+shader_parameter/UVRot = 0.0
+shader_parameter/pivot = Vector2(0, 0)
+shader_parameter/tint = Color(1, 1, 1, 1)
+shader_parameter/albedoBrightness = 0.0
+shader_parameter/albedoContrast = 0.0
+shader_parameter/roughnessLevel = 0.0
+shader_parameter/roughnessContrast = 0.0
+shader_parameter/normalIntensity = 1.0
+shader_parameter/aoLevel = 0.0
+shader_parameter/baseRough = ExtResource("10_65gih")
+shader_parameter/normAOHeight = ExtResource("11_ywqvq")
+script = ExtResource("5_yh4s2")
+metadata/_custom_type_script = "uid://xmaw7xa28d6b"
+
+[sub_resource type="Resource" id="Resource_nmmso"]
+resource_name = "Moss"
+script = ExtResource("2_65gih")
+label = "Moss"
+surface_material = SubResource("ShaderMaterial_yhfsj")
+mask_material = SubResource("ShaderMaterial_ywqvq")
+
+[resource]
+resource_name = "layer_stack"
+render_priority = 0
+shader = ExtResource("12_s7cpd")
+shader_parameter/s_layer_0_dispStrength = 0.265
+shader_parameter/s_layer_0_heightOffset_d = 0.5
+shader_parameter/s_layer_0_UVScale = 1.0
+shader_parameter/s_layer_0_UVOffset = Vector2(0, 0)
+shader_parameter/s_layer_0_UVRot = 0.0
+shader_parameter/s_layer_0_pivot = Vector2(0, 0)
+shader_parameter/s_layer_0_tint = Color(1, 1, 1, 1)
+shader_parameter/s_layer_0_albedoBrightness = 0.0
+shader_parameter/s_layer_0_albedoContrast = 0.10400005244
+shader_parameter/s_layer_0_roughnessLevel = 0.0
+shader_parameter/s_layer_0_roughnessContrast = 0.0
+shader_parameter/s_layer_0_normalIntensity = 1.0
+shader_parameter/s_layer_0_aoLevel = 0.0
+shader_parameter/m_layer_1_vertexColor = 0
+shader_parameter/m_layer_1_heightOffset = 0.7310000347225
+shader_parameter/m_layer_1_heightContrast = 0.3030000143925
+shader_parameter/m_layer_1_invertHeight = true
+shader_parameter/s_layer_1_dispStrength = 0.14
+shader_parameter/s_layer_1_heightOffset_d = 0.279
+shader_parameter/s_layer_1_UVScale = 1.0
+shader_parameter/s_layer_1_UVOffset = Vector2(0, 0)
+shader_parameter/s_layer_1_UVRot = 0.0
+shader_parameter/s_layer_1_pivot = Vector2(0, 0)
+shader_parameter/s_layer_1_tint = Color(1, 1, 1, 1)
+shader_parameter/s_layer_1_albedoBrightness = 0.0
+shader_parameter/s_layer_1_albedoContrast = 0.0
+shader_parameter/s_layer_1_roughnessLevel = 0.0
+shader_parameter/s_layer_1_roughnessContrast = 0.0
+shader_parameter/s_layer_1_normalIntensity = 1.0
+shader_parameter/s_layer_1_aoLevel = 0.0
+shader_parameter/m_layer_2_vertexColor = 1
+shader_parameter/m_layer_2_heightOffset = 0.6470000307325
+shader_parameter/m_layer_2_heightContrast = 0.0870000041325
+shader_parameter/m_layer_2_invertHeight = true
+shader_parameter/s_layer_2_dispStrength = 0.0
+shader_parameter/s_layer_2_heightOffset_d = 0.5
+shader_parameter/s_layer_2_UVScale = 2.0
+shader_parameter/s_layer_2_UVOffset = Vector2(0, 0)
+shader_parameter/s_layer_2_UVRot = 0.0
+shader_parameter/s_layer_2_pivot = Vector2(0, 0)
+shader_parameter/s_layer_2_tint = Color(1, 1, 1, 1)
+shader_parameter/s_layer_2_albedoBrightness = 0.0
+shader_parameter/s_layer_2_albedoContrast = 0.0
+shader_parameter/s_layer_2_roughnessLevel = 0.0
+shader_parameter/s_layer_2_roughnessContrast = 0.0
+shader_parameter/s_layer_2_normalIntensity = 1.0
+shader_parameter/s_layer_2_aoLevel = 0.0
+shader_parameter/s_layer_0_baseRough = ExtResource("3_51bgu")
+shader_parameter/s_layer_0_normAOHeight = ExtResource("4_65wpu")
+shader_parameter/s_layer_1_baseRough = ExtResource("8_psm1d")
+shader_parameter/s_layer_1_normAOHeight = ExtResource("9_pi7h7")
+shader_parameter/s_layer_2_baseRough = ExtResource("10_65gih")
+shader_parameter/s_layer_2_normAOHeight = ExtResource("11_ywqvq")
+script = ExtResource("11_ut74i")
+base_layer = SubResource("ShaderMaterial_6wgmd")
+layers = Array[ExtResource("2_65gih")]([SubResource("Resource_xe8pq"), SubResource("Resource_nmmso")])
+metadata/_custom_type_script = "uid://c4poekual5gov"
