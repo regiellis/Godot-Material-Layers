@@ -104,9 +104,52 @@ func test_conflicting_defines_keep_the_first() -> void:
 	check_compiles(code, "a define conflict still yields a working shader")
 
 
-func test_render_mode_is_dropped() -> void:
+func test_render_mode_carries_from_base() -> void:
 	var code := _gen("render_mode unshaded;\nuniform float value = 1.0;\n")
-	check_contains(code, "render_mode", "render_mode reaches the generated shader")
+	check_contains(code, "render_mode unshaded;", "base layer render_mode reaches the output")
+	check_compiles(code, "render_mode carries from the base layer")
+
+
+const RENDER_MODE_TOP := HEAD + """
+render_mode unshaded;
+uniform float gain = 1.0;
+void fragment() {
+	SETUP_LAYER_FRAGMENT;
+	LAYER_OUT_ALBEDO = vec3(gain);
+	ALBEDO = LAYER_OUT_ALBEDO;
+}
+"""
+
+
+func test_render_mode_on_upper_layer_is_ignored() -> void:
+	var code := generate(surface(HEAD + """
+uniform float value = 1.0;
+void fragment() {
+	SETUP_LAYER_FRAGMENT;
+	LAYER_OUT_ALBEDO = vec3(value);
+	LAYER_OUT_HEIGHT = 0.5;
+	ALBEDO = LAYER_OUT_ALBEDO;
+}
+"""), [texture_masked_layer(RENDER_MODE_TOP)])
+
+	check_not_contains(code, "render_mode", "only the base layer's render_mode is honoured")
+	check_compiles(code, "an ignored render_mode still yields a working shader")
+
+
+func test_custom_light_is_dropped() -> void:
+	var code := _gen("uniform float value = 1.0;\n", """
+void fragment() {
+	SETUP_LAYER_FRAGMENT;
+	LAYER_OUT_ALBEDO = vec3(value);
+	ALBEDO = LAYER_OUT_ALBEDO;
+}
+
+void light() {
+	DIFFUSE_LIGHT += ALBEDO * ATTENUATION;
+}
+""")
+	check_not_contains(code, "void light", "the light() function is not carried over")
+	check_compiles(code, "a layer with a light() function still compiles")
 
 
 func test_instance_uniform_survives() -> void:

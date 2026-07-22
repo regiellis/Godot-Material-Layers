@@ -713,6 +713,27 @@ func parse_defines(shader: String) -> Array:
 	return result
 
 
+## Collects render_mode statements. Only the base layer's are honoured; a
+## merged shader has no meaningful answer for whose blend mode wins, so the
+## stack takes the base layer's and warns about the rest.
+func parse_render_modes(shader: String) -> Array:
+	var render_regex := RegEx.new()
+	render_regex.compile("\\brender_mode\\b[^;]*;")
+	var result : Array = []
+	for m in render_regex.search_all(shader):
+		result.append(m.get_string())
+	return result
+
+
+## Warns about layer-shader constructs the generator cannot carry into the
+## combined shader.
+func _validate_layer_shader(code: String, what: String) -> void:
+	var light_regex := RegEx.new()
+	light_regex.compile("void\\s+light\\s*\\(")
+	if light_regex.search(code) != null:
+		push_warning("Material Layers: %s declares a custom light() function, which is not supported in a LayerStack and is ignored." % what)
+
+
 ## Records a #define, deduplicating identical redefinitions and reporting
 ## conflicting ones. Macro names are shared across the whole stack; the first
 ## definition of a name wins.
@@ -1580,6 +1601,7 @@ func _generate_code(assets: Array) -> String:
 
 	var all_includes := []
 	var all_global_macros := []
+	var all_render_modes := []
 	var all_defines := []
 	var define_bodies := {}
 	var all_structs := []
@@ -1617,6 +1639,10 @@ func _generate_code(assets: Array) -> String:
 
 		var surface_c := strip_comments(surface_shader.code)
 
+		_validate_layer_shader(surface_c, "layer %d's surface shader" % slot)
+		if mask_c != "":
+			_validate_layer_shader(mask_c, "layer %d's mask shader" % slot)
+
 		var mask_fragment_body := ""
 		var mask_vertex_body := ""
 
@@ -1638,6 +1664,8 @@ func _generate_code(assets: Array) -> String:
 			var mask_consts := parse_consts(mask_c, true, slot)
 			for define in parse_defines(mask_c):
 				merge_define(define, define_bodies, all_defines, slot)
+			if not parse_render_modes(mask_c).is_empty():
+				push_warning("Material Layers: layer %d's mask shader declares 'render_mode', which is ignored; only the base layer's render_mode is used." % slot)
 			var mask_helper_funcs := parse_helper_funcs(mask_c, true, slot, mask_structs["identifiers"])
 			var mask_fragment := get_fragment(mask_c)
 			var mask_parsed_fragment := parse_fragment(mask_fragment, slot, mask_structs["identifiers"])
@@ -1708,6 +1736,13 @@ func _generate_code(assets: Array) -> String:
 		var surface_consts := parse_consts(surface_c, false, slot)
 		for define in parse_defines(surface_c):
 			merge_define(define, define_bodies, all_defines, slot)
+
+		var surface_render_modes := parse_render_modes(surface_c)
+		if slot == 0:
+			all_render_modes.append_array(surface_render_modes)
+			all_render_modes = dedup(all_render_modes)
+		elif not surface_render_modes.is_empty():
+			push_warning("Material Layers: layer %d's surface shader declares 'render_mode', which is ignored; only the base layer's render_mode is used." % slot)
 
 		var surface_helper_funcs := parse_helper_funcs(surface_c, false, slot, surface_structs["identifiers"])
 		surface_helper_funcs["functions"] = prefix_helper_funcs(
@@ -1817,6 +1852,8 @@ func _generate_code(assets: Array) -> String:
 	all_vertex_funcs = prefix_vertex_fragment_samplers(all_vertex_funcs, deduped_samplers["originals"], deduped_samplers["renames"])
 	all_helper_funcs = prefix_vertex_fragment_samplers(all_helper_funcs, deduped_samplers["originals"], deduped_samplers["renames"])
 	mega_shader.append("shader_type spatial;")
+	if not all_render_modes.is_empty():
+		mega_shader.append("\n" + "\n".join(all_render_modes))
 	mega_shader.append("\n\n")
 	mega_shader.append("\n".join(all_includes))
 	mega_shader.append("\n")
