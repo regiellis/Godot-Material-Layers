@@ -120,13 +120,31 @@ func test_three_layer_chain() -> void:
 	check_compiles(code, "three-layer stack compiles")
 
 
-func test_missing_base_layer() -> void:
+func test_missing_base_layer_refuses_to_generate() -> void:
 	var stack := LayerStack.new()
 	stack.layers = [texture_masked_layer(TOP)] as Array[MaterialLayer]
 	stack.compile()
-	var code: String = stack.shader.code if stack.shader else ""
 
-	# Slot 0 is skipped when it has no shader, so nothing declares finalFragment.
-	check_contains(code, "void fragment()", "still emits a fragment function")
-	check(not compiles(code) or code.contains("fragmentMaterial finalFragment"),
-		"a stack with no base layer must not emit code that references an undeclared finalFragment")
+	check(stack.shader == null,
+		"compile() must refuse to generate a shader without a base layer")
+
+
+func test_clearing_base_layer_keeps_the_last_shader() -> void:
+	var stack := LayerStack.new()
+	stack.base_layer = surface(BASE)
+	stack.compile()
+	var before: String = stack.shader.code
+
+	stack.base_layer = null
+	stack.compile()
+	check_eq(stack.shader.code, before,
+		"compile() without a base layer leaves the previous shader untouched")
+
+
+func test_layer_without_surface_material_is_skipped() -> void:
+	var stack := LayerStack.new()
+	stack.base_layer = surface(BASE)
+	stack.layers = [MaterialLayer.new()] as Array[MaterialLayer]
+	stack.compile()
+
+	check_compiles(stack.shader.code, "an unconfigured layer is skipped, not fatal")

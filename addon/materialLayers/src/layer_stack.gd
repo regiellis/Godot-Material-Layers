@@ -1551,6 +1551,9 @@ func _generate_code(assets: Array) -> String:
 
 		var surface_shader: Shader = asset["surface_shader"]
 		if surface_shader == null:
+			var layer: MaterialLayer = asset["layer"]
+			if layer != null and layer.active:
+				push_warning("Material Layers: layer %d has no Surface Material and was skipped." % slot)
 			continue
 		
 		
@@ -1867,6 +1870,10 @@ func ensure_assets_and_update() -> void:
 
 
 func compile() -> void:
+	if base_layer == null or base_layer.shader == null:
+		push_error("Material Layers: LayerStack has no base layer; assign a SurfaceMaterial to Base Layer, then press Generate.")
+		return
+
 	for layer in layers:
 		if layer:
 			layer.resource_name = layer.label
