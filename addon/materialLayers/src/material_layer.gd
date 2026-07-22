@@ -7,6 +7,9 @@ extends Resource
 
 signal material_replaced
 signal mask_updated
+## Emitted when a change alters the generated shader's structure, so the
+## stack knows a recompile is needed rather than just a value sync.
+signal structure_changed
 
 @export var label: String = "Layer":
 	set(val):
@@ -16,6 +19,7 @@ signal mask_updated
 	set(val):
 		active = val
 		emit_changed()
+		structure_changed.emit()
     
 ## Stored by reference: editing the assigned material asset updates every
 ## stack that uses it. For a per-stack copy, use Godot's own Make Unique.
@@ -35,12 +39,14 @@ enum MaskType { TEXTURE, MATERIAL }
 		mask_active = val
 		emit_changed()
 		notify_property_list_changed()
+		structure_changed.emit()
 
 @export var mask_type: MaskType = MaskType.MATERIAL:
 	set(val):
 		mask_type = val
 		emit_changed()
 		notify_property_list_changed()
+		structure_changed.emit()
 
 @export var mask_texture: Texture2D:
 	set(val):

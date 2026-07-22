@@ -42,7 +42,7 @@ Material Layers introduces 4 new resources.
 - <img align="absmiddle" width="20" alt="surfaceMaterial" src="addon/materialLayers/icons/surfaceMaterial.svg"/>**`SurfaceMaterial`**: Material that's blended using mask texture or `MaskMaterial`. Contains a `.gdshader` template with new layer specific inputs & outputs. You write your own material, then output them using the new output tokens.
 - <img align="absmiddle" width="20" alt="maskMaterial" src="addon/materialLayers/icons/maskMaterial.svg"/>**`MaskMaterial`**: Material used to blend `SurfaceMaterial`s. You write your own blending logic such as height blending, vertex colors or sample textures. You control how each material attribute is blended.
 
-Materials assigned to a stack are referenced, not copied: editing a saved material such as `mossLayer.tres` updates every stack that uses it, live. Use Godot's **Make Unique** on the material slot when you want a one-off copy for a single stack. Changing a layer's structure (active, mask type, swapping materials) takes effect when you press **Generate**.
+Materials assigned to a stack are referenced, not copied: editing a saved material such as `mossLayer.tres` updates every stack that uses it, live. Use Godot's **Make Unique** on the material slot when you want a one-off copy for a single stack. Changing a layer's structure (active, mask type, swapping materials) regenerates the shader automatically; turn off **Auto Generate** on the stack if you prefer to press **Generate** yourself.
 
 ## Quick Start
 

@@ -9,9 +9,15 @@ func _init() -> void:
 	resource_name = "layer_stack"
 	call_deferred("_auto_compile_on_load")
 
-var _base_layer_initialized := false
-var _layers_initialized := false
-var _compiled := false
+# Armed one frame after _init by _auto_compile_on_load, so the setter storm
+# of resource loading never triggers a regeneration.
+var _auto_armed := false
+var _auto_compile_queued := false
+
+## Regenerate the shader automatically when the stack's structure changes:
+## a layer toggled, its mask type switched, a material swapped, or the layer
+## list edited. Turn off to control generation manually with Generate.
+@export var auto_generate: bool = true
 
 ## [img width=32]res://addons/materialLayers/icons/surfaceMaterial.svg[/img]
 ## Base layer. Stored by reference: editing the assigned material asset
@@ -24,7 +30,7 @@ var _compiled := false
 		if base_layer and not base_layer.changed.is_connected(_on_uniform_changed):
 			base_layer.changed.connect(_on_uniform_changed)
 		_invalidate_assets()
-		_base_layer_initialized = true
+		_schedule_auto_compile()
 		emit_changed()
 
 
@@ -37,6 +43,8 @@ var _compiled := false
 				layer.material_replaced.disconnect(_on_material_replaced)
 			if layer and layer.mask_updated.is_connected(_on_mask_updated):
 				layer.mask_updated.disconnect(_on_mask_updated)
+			if layer and layer.structure_changed.is_connected(_on_structure_changed):
+				layer.structure_changed.disconnect(_on_structure_changed)
 			if layer and layer.surface_material and layer.surface_material.changed.is_connected(_on_uniform_changed):
 				layer.surface_material.changed.disconnect(_on_uniform_changed)
 			if layer and layer.mask_material and layer.mask_material.changed.is_connected(_on_uniform_changed):
@@ -48,6 +56,7 @@ var _compiled := false
 		layers = arr
 		_reconnect_layer_signals()
 		_invalidate_assets()
+		_schedule_auto_compile()
 		emit_changed()
 
 var layer_uniform_maps: Array = []
@@ -369,6 +378,9 @@ func _reconnect_layer_signals() -> void:
 		if layer.mask_updated.is_connected(_on_mask_updated):
 			layer.mask_updated.disconnect(_on_mask_updated)
 		layer.mask_updated.connect(_on_mask_updated)
+		if layer.structure_changed.is_connected(_on_structure_changed):
+			layer.structure_changed.disconnect(_on_structure_changed)
+		layer.structure_changed.connect(_on_structure_changed)
 		if layer.surface_material:
 			if layer.surface_material.changed.is_connected(_on_uniform_changed):
 				layer.surface_material.changed.disconnect(_on_uniform_changed)
@@ -382,6 +394,33 @@ func _reconnect_layer_signals() -> void:
 func _on_material_replaced() -> void:
 	_invalidate_assets()
 	_reconnect_layer_signals()
+	_schedule_auto_compile()
+
+
+func _on_structure_changed() -> void:
+	_invalidate_assets()
+	_schedule_auto_compile()
+
+
+## Coalesces any number of structural edits in one frame into a single
+## deferred recompile. Does nothing until armed (after load) or when
+## auto_generate is off.
+func _schedule_auto_compile() -> void:
+	if not auto_generate or not _auto_armed or _auto_compile_queued:
+		return
+	_auto_compile_queued = true
+	call_deferred("_run_auto_compile")
+
+
+func _run_auto_compile() -> void:
+	_auto_compile_queued = false
+	if not auto_generate:
+		return
+	# A half-built stack is normal mid-edit; stay quiet until it has a base
+	# layer. The explicit Generate button still reports the error.
+	if base_layer == null or base_layer.shader == null:
+		return
+	compile()
 
 
 func _on_mask_updated() -> void:
@@ -1818,6 +1857,7 @@ func _generate_code(assets: Array) -> String:
 
 
 func _auto_compile_on_load() -> void:
+	_auto_armed = true
 	if shader and not layers.is_empty():
 		_rebuild_uniform_maps()
 		ensure_assets_and_update()

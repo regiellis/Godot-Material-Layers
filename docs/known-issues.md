@@ -17,8 +17,7 @@ missing base layer emitting a broken shader instead of a clear error. See the gi
 
 ## Smaller things
 
-- **Dead code.** `get_fragment_macros` is never called. `_base_layer_initialized`,
-  `_layers_initialized` and `_compiled` are never read. `l_mixVertex` in `layer_lib.gdshaderinc` is
+- **Dead code.** `get_fragment_macros` is never called. `l_mixVertex` in `layer_lib.gdshaderinc` is
   never called, because the vertex stage has no texture-mask blend path at all: `blend_vertex_block`
   only seeds `finalVertex` at slot 0.
 - **`get_global_macros` matches a macro that does not exist.** It searches for `SETUP_VARYINGS`,
