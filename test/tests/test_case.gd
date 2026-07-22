@@ -149,6 +149,8 @@ static func _is_declared(code: String, tok: String) -> bool:
 		"(?:" + types + ")\\s+" + tok + "\\s*\\(",        # function definition
 		"(?:" + types + ")\\s+" + tok + "\\s*[=;,]",      # local / global declaration
 		"varying\\s+[\\w\\s]*" + tok + "\\b",             # varying
+		"struct\\s+" + tok + "\\b",                       # struct declaration
+		"[sm]_layer_\\d+_\\w+\\s+" + tok + "\\s*[=;,]",   # local of a struct type
 	]
 	for p in patterns:
 		var rx := RegEx.new()

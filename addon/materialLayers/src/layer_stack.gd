@@ -587,6 +587,153 @@ func parse_global_uniforms(shader: String, index: int) -> Dictionary:
 	return {"uniforms": uniforms}
 
 
+## Collects global "const" declarations and namespaces their identifiers, so
+## two layers may declare the same constant name. Function-local consts are
+## left where they are.
+func parse_consts(shader: String, is_mask: bool, index: int) -> Dictionary:
+	var prefix := "s_layer_%d_" % index
+	if is_mask:
+		prefix = "m_layer_%d_" % index
+	var directive_regex := RegEx.new()
+	directive_regex.compile("#[^\\n]*")
+	var stripped := directive_regex.sub(shader, "", true)
+
+	var consts : Array = []
+	var identifiers : Array = []
+	var depth := 0
+	var buffer := ""
+	var i := 0
+	var n := stripped.length()
+
+	while i < n:
+		var c := stripped[i]
+
+		if c == "{":
+			# Braces in a global const are an array initializer, not a scope.
+			if depth == 0 and buffer.strip_edges().begins_with("const "):
+				var d := 1
+				buffer += c
+				i += 1
+				while i < n and d > 0:
+					var c2 := stripped[i]
+					if c2 == "{":
+						d += 1
+					elif c2 == "}":
+						d -= 1
+					buffer += c2
+					i += 1
+				continue
+			depth += 1
+			buffer = ""
+			i += 1
+			continue
+
+		if c == "}":
+			depth = max(depth - 1, 0)
+			buffer = ""
+			i += 1
+			continue
+
+		if c == ";" and depth == 0:
+			var line := buffer.strip_edges()
+			if line.begins_with("const "):
+				consts.append(line + ";")
+				var head := line.trim_prefix("const ").strip_edges()
+				var eq := head.find("=")
+				var decl := head.substr(0, eq).strip_edges() if eq != -1 else head
+				var decl_tokens := decl.split(" ", false)
+				var id_token: String = decl_tokens[decl_tokens.size() - 1]
+				identifiers.append(id_token.get_slice("[", 0))
+			buffer = ""
+			i += 1
+			continue
+
+		if depth == 0:
+			buffer += c
+		i += 1
+
+	# Rename in a second pass so a constant may reference an earlier one.
+	var result := []
+	for const_decl in consts:
+		var text: String = const_decl
+		for identifier in identifiers:
+			var regex := RegEx.new()
+			regex.compile("\\b" + identifier + "\\b")
+			text = regex.sub(text, prefix + identifier, true)
+		result.append(text)
+
+	return {"consts": result, "identifiers": identifiers}
+
+
+## Extracts global struct declarations and namespaces the struct name, so two
+## layers may declare the same type. Field names are untouched.
+func parse_structs(shader: String, is_mask: bool, index: int) -> Dictionary:
+	var sig := RegEx.new()
+	sig.compile("struct\\s+(\\w+)\\s*\\{")
+	var raw : Array = []
+	var identifiers : Array = []
+	var n := shader.length()
+
+	for m in sig.search_all(shader):
+		var i := m.get_end()
+		var depth := 1
+		while i < n and depth > 0:
+			var c := shader[i]
+			if c == "{":
+				depth += 1
+			elif c == "}":
+				depth -= 1
+			i += 1
+		raw.append(shader.substr(m.get_start(), i - m.get_start()) + ";")
+		identifiers.append(m.get_string(1))
+
+	var prefix := "s_layer_%d_" % index
+	if is_mask:
+		prefix = "m_layer_%d_" % index
+	var result := []
+	for st in raw:
+		var text: String = st
+		for identifier in identifiers:
+			var regex := RegEx.new()
+			regex.compile("\\b" + identifier + "\\b")
+			text = regex.sub(text, prefix + identifier, true)
+		result.append(text)
+
+	return {"structs": result, "identifiers": identifiers}
+
+
+## Collects #define directives, including line continuations, so they can be
+## carried into the generated shader verbatim.
+func parse_defines(shader: String) -> Array:
+	var define_regex := RegEx.new()
+	define_regex.compile("#define(?:[^\\n]*\\\\\\r?\\n)*[^\\n]*")
+	var result : Array = []
+	for m in define_regex.search_all(shader):
+		result.append(m.get_string())
+	return result
+
+
+## Records a #define, deduplicating identical redefinitions and reporting
+## conflicting ones. Macro names are shared across the whole stack; the first
+## definition of a name wins.
+func merge_define(define: String, seen: Dictionary, out: Array, slot: int) -> void:
+	var name_regex := RegEx.new()
+	name_regex.compile("#define\\s+(\\w+)")
+	var m := name_regex.search(define)
+	if m == null:
+		return
+	var macro_name := m.get_string(1)
+	var ws_regex := RegEx.new()
+	ws_regex.compile("[\\s\\\\]+")
+	var normalized := ws_regex.sub(define, " ", true).strip_edges()
+	if seen.has(macro_name):
+		if seen[macro_name] != normalized:
+			push_error("Material Layers: layer %d redefines macro '%s' with a different body; the first definition is kept." % [slot, macro_name])
+		return
+	seen[macro_name] = normalized
+	out.append(define)
+
+
 func copy_uniform_values(mega_material: ShaderMaterial, layer_uniform_maps: Array) -> void:
 	for layer in layer_uniform_maps:
 		var identifiers: Array = layer["identifiers"]
@@ -765,7 +912,7 @@ func get_vertex(shader: String) -> String:
 	return shader.substr(start, end - start)
 
 
-func parse_fragment(body: String, index: int) -> Dictionary:
+func parse_fragment(body: String, index: int, extra_types: Array = []) -> Dictionary:
 	var statements := []
 	var identifiers := []
 	var buffer := ""
@@ -866,7 +1013,7 @@ func parse_fragment(body: String, index: int) -> Dictionary:
 		if tokens.size() < 2:
 			continue
 
-		if not TYPES.has(tokens[0]):
+		if not TYPES.has(tokens[0]) and not extra_types.has(tokens[0]):
 			continue
 
 		var identifier: String = tokens[1]
@@ -875,7 +1022,7 @@ func parse_fragment(body: String, index: int) -> Dictionary:
 	return {"fragment": fragment, "identifiers": identifiers, "macros": macros, "mask": mask_out}
 
 
-func parse_vertex(body: String, index: int) -> Dictionary:
+func parse_vertex(body: String, index: int, extra_types: Array = []) -> Dictionary:
 	var statements := []
 	var identifiers := []
 	var buffer := ""
@@ -984,7 +1131,7 @@ func parse_vertex(body: String, index: int) -> Dictionary:
 		if tokens.size() < 2:
 			continue
 
-		if not TYPES.has(tokens[0]):
+		if not TYPES.has(tokens[0]) and not extra_types.has(tokens[0]):
 			continue
 
 		var identifier: String = tokens[1]
@@ -1217,8 +1364,11 @@ func prefix_function_calls(body: String, func_names: Array, is_mask: bool, index
 	return result
 
 
-func parse_helper_funcs(shader: String, is_mask: bool, index: int) -> Dictionary:
-	var type_pattern := "(?:" + "|".join(TYPES) + ")"
+func parse_helper_funcs(shader: String, is_mask: bool, index: int, extra_types: Array = []) -> Dictionary:
+	var all_types := TYPES.duplicate()
+	all_types.append("void")
+	all_types.append_array(extra_types)
+	var type_pattern := "(?:" + "|".join(all_types) + ")"
 	var sig := RegEx.new()
 	sig.compile(type_pattern + "\\s+(\\w+)\\s*\\(([^)]*)\\)\\s*\\{")
 
@@ -1430,6 +1580,10 @@ func _generate_code(assets: Array) -> String:
 
 	var all_includes := []
 	var all_global_macros := []
+	var all_defines := []
+	var define_bodies := {}
+	var all_structs := []
+	var all_consts := []
 	var all_varyings := []
 	var all_uniforms := []
 	var all_global_uniforms := []
@@ -1480,18 +1634,27 @@ func _generate_code(assets: Array) -> String:
 			var mask_uniforms = parse_uniforms(mask_c, true, slot)
 			var mask_global_uniforms = parse_global_uniforms(mask_c, slot)
 			var mask_varyings = parse_varyings(mask_c, slot)
-			var mask_helper_funcs := parse_helper_funcs(mask_c, true, slot)
+			var mask_structs := parse_structs(mask_c, true, slot)
+			var mask_consts := parse_consts(mask_c, true, slot)
+			for define in parse_defines(mask_c):
+				merge_define(define, define_bodies, all_defines, slot)
+			var mask_helper_funcs := parse_helper_funcs(mask_c, true, slot, mask_structs["identifiers"])
 			var mask_fragment := get_fragment(mask_c)
-			var mask_parsed_fragment := parse_fragment(mask_fragment, slot)
+			var mask_parsed_fragment := parse_fragment(mask_fragment, slot, mask_structs["identifiers"])
 			mask_fragment_body = mask_parsed_fragment["fragment"]
 			var mask_vertex := get_vertex(mask_c)
-			var mask_parsed_vertex := parse_vertex(mask_vertex, slot)
+			var mask_parsed_vertex := parse_vertex(mask_vertex, slot, mask_structs["identifiers"])
 			mask_vertex_body = mask_parsed_vertex["vertex"]
 
 			mask_helper_funcs["functions"] = prefix_helper_funcs(
 				mask_helper_funcs["functions"],
-				mask_uniforms["uniform_identifiers"] + mask_uniforms["sampler_identifiers"],
+				mask_uniforms["uniform_identifiers"] + mask_uniforms["sampler_identifiers"]
+					+ mask_consts["identifiers"] + mask_structs["identifiers"],
 				true, slot)
+			var mask_prefixed_helpers := []
+			for fn in mask_helper_funcs["functions"]:
+				mask_prefixed_helpers.append(prefix_function_calls(fn, mask_structs["identifiers"], true, slot))
+			mask_helper_funcs["functions"] = mask_prefixed_helpers
 
 
 			all_includes.append_array(mask_includes)
@@ -1499,15 +1662,21 @@ func _generate_code(assets: Array) -> String:
 			all_uniforms.append_array(mask_uniforms["uniforms"])
 			all_global_uniforms.append_array(mask_global_uniforms["uniforms"])
 			all_varyings.append_array(mask_varyings["varyings"])
+			all_structs.append_array(mask_structs["structs"])
+			all_consts.append_array(mask_consts["consts"])
 			all_helper_funcs.append_array(mask_helper_funcs["functions"])
 
 			all_identifiers.append_array(mask_uniforms["uniform_identifiers"])
 			all_identifiers.append_array(mask_uniforms["sampler_identifiers"])
+			all_identifiers.append_array(mask_consts["identifiers"])
+			all_identifiers.append_array(mask_structs["identifiers"])
 			all_identifiers.append_array(mask_helper_funcs["identifiers"])
 			all_identifiers.append_array(mask_parsed_fragment["identifiers"])
 
 			vertex_identifiers.append_array(mask_uniforms["uniform_identifiers"])
 			vertex_identifiers.append_array(mask_uniforms["sampler_identifiers"])
+			vertex_identifiers.append_array(mask_consts["identifiers"])
+			vertex_identifiers.append_array(mask_structs["identifiers"])
 			vertex_identifiers.append_array(mask_helper_funcs["identifiers"])
 			vertex_identifiers.append_array(mask_parsed_vertex["identifiers"])
 
@@ -1521,9 +1690,9 @@ func _generate_code(assets: Array) -> String:
 			})
 
 			mask_fragment_body = prefix_vertex_fragment(mask_fragment_body, all_identifiers, true, slot)
-			mask_fragment_body = prefix_function_calls(mask_fragment_body, mask_helper_funcs["identifiers"], true, slot)
+			mask_fragment_body = prefix_function_calls(mask_fragment_body, mask_helper_funcs["identifiers"] + mask_structs["identifiers"], true, slot)
 			mask_vertex_body = prefix_vertex_fragment(mask_vertex_body, vertex_identifiers, true, slot)
-			mask_vertex_body = prefix_function_calls(mask_vertex_body, mask_helper_funcs["identifiers"], true, slot)
+			mask_vertex_body = prefix_function_calls(mask_vertex_body, mask_helper_funcs["identifiers"] + mask_structs["identifiers"], true, slot)
 
 		
 		var surface_global_macros := get_global_macros(surface_c)
@@ -1535,18 +1704,28 @@ func _generate_code(assets: Array) -> String:
 
 		var parsed_varyings := parse_varyings(surface_c, slot)
 
-		var surface_helper_funcs := parse_helper_funcs(surface_c, false, slot)
+		var surface_structs := parse_structs(surface_c, false, slot)
+		var surface_consts := parse_consts(surface_c, false, slot)
+		for define in parse_defines(surface_c):
+			merge_define(define, define_bodies, all_defines, slot)
+
+		var surface_helper_funcs := parse_helper_funcs(surface_c, false, slot, surface_structs["identifiers"])
 		surface_helper_funcs["functions"] = prefix_helper_funcs(
 			surface_helper_funcs["functions"],
-			surface_uniforms["uniform_identifiers"] + surface_uniforms["sampler_identifiers"],
+			surface_uniforms["uniform_identifiers"] + surface_uniforms["sampler_identifiers"]
+				+ surface_consts["identifiers"] + surface_structs["identifiers"],
 			false, slot)
+		var surface_prefixed_helpers := []
+		for fn in surface_helper_funcs["functions"]:
+			surface_prefixed_helpers.append(prefix_function_calls(fn, surface_structs["identifiers"], false, slot))
+		surface_helper_funcs["functions"] = surface_prefixed_helpers
 
 		var surface_fragment := get_fragment(surface_c)
-		var surface_parsed_fragment := parse_fragment(surface_fragment, slot)
+		var surface_parsed_fragment := parse_fragment(surface_fragment, slot, surface_structs["identifiers"])
 		var surface_fragment_body: String = surface_parsed_fragment["fragment"]
 		
 		var surface_vertex := get_vertex(surface_c)
-		var surface_parsed_vertex := parse_vertex(surface_vertex, slot)
+		var surface_parsed_vertex := parse_vertex(surface_vertex, slot, surface_structs["identifiers"])
 		var surface_vertex_body: String = surface_parsed_vertex["vertex"]
 
 		layer_uniform_maps.append({
@@ -1563,6 +1742,8 @@ func _generate_code(assets: Array) -> String:
 
 		all_varyings.append_array(parsed_varyings["varyings"])
 		all_varyings = dedup(all_varyings)
+		all_structs.append_array(surface_structs["structs"])
+		all_consts.append_array(surface_consts["consts"])
 		all_helper_funcs.append_array(surface_helper_funcs["functions"])
 		all_helper_funcs.append("\n")
 
@@ -1586,16 +1767,20 @@ func _generate_code(assets: Array) -> String:
 
 		all_identifiers.append_array(surface_uniforms["uniform_identifiers"])
 		all_identifiers.append_array(surface_uniforms["sampler_identifiers"])
+		all_identifiers.append_array(surface_consts["identifiers"])
+		all_identifiers.append_array(surface_structs["identifiers"])
 		all_identifiers.append_array(surface_helper_funcs["identifiers"])
 		all_identifiers.append_array(surface_parsed_fragment["identifiers"])
 
 		vertex_identifiers.append_array(surface_uniforms["uniform_identifiers"])
 		vertex_identifiers.append_array(surface_uniforms["sampler_identifiers"])
+		vertex_identifiers.append_array(surface_consts["identifiers"])
+		vertex_identifiers.append_array(surface_structs["identifiers"])
 		vertex_identifiers.append_array(surface_helper_funcs["identifiers"])
 		vertex_identifiers.append_array(surface_parsed_vertex["identifiers"])
 
 		surface_fragment_body = prefix_vertex_fragment(surface_fragment_body, all_identifiers, false, slot)
-		surface_fragment_body = prefix_function_calls(surface_fragment_body, surface_helper_funcs["identifiers"], false, slot)
+		surface_fragment_body = prefix_function_calls(surface_fragment_body, surface_helper_funcs["identifiers"] + surface_structs["identifiers"], false, slot)
 		surface_fragment_body = blend_layer_data_block(surface_fragment_body,slot)
 		surface_fragment_body = blend_fragment_block(surface_fragment_body, mask_expr, slot, mask_type, mask_active)
 
@@ -1612,7 +1797,7 @@ func _generate_code(assets: Array) -> String:
 		all_fragment_funcs.append("\n")
 
 		surface_vertex_body = prefix_vertex_fragment(surface_vertex_body, vertex_identifiers, false, slot)
-		surface_vertex_body = prefix_function_calls(surface_vertex_body, surface_helper_funcs["identifiers"], false, slot)
+		surface_vertex_body = prefix_function_calls(surface_vertex_body, surface_helper_funcs["identifiers"] + surface_structs["identifiers"], false, slot)
 		surface_vertex_body = blend_vertex_block(surface_vertex_body, mask_expr, slot, mask_type, mask_active)
 
 		all_vertex_funcs.append(vertex_layer_out(slot))
@@ -1634,10 +1819,16 @@ func _generate_code(assets: Array) -> String:
 	mega_shader.append("shader_type spatial;")
 	mega_shader.append("\n\n")
 	mega_shader.append("\n".join(all_includes))
+	mega_shader.append("\n")
+	mega_shader.append("\n".join(all_defines))
 	mega_shader.append("\n".join(all_global_macros) + "\n")
+	mega_shader.append("\n")
+	mega_shader.append("\n".join(all_structs))
 	mega_shader.append("\n")
 	mega_shader.append("\n".join(all_varyings))
 	mega_shader.append("\n\n")
+	mega_shader.append("\n".join(all_consts))
+	mega_shader.append("\n")
 	mega_shader.append("\n".join(all_uniforms))
 	mega_shader.append("\n\n")
 	mega_shader.append("\n".join(all_global_uniforms))

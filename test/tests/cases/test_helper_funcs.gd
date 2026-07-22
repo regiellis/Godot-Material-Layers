@@ -107,6 +107,28 @@ void fragment() {
 	check_compiles(code, "a helper reading a uniform compiles")
 
 
+func test_void_helper_survives() -> void:
+	var code := generate(surface(HEAD + """
+uniform float fogAmount = 0.5;
+
+void applyFog(inout vec3 color, float amount) {
+	color = mix(color, vec3(0.5), amount);
+}
+
+void fragment() {
+	SETUP_LAYER_FRAGMENT;
+	vec3 c = vec3(fogAmount);
+	applyFog(c, fogAmount);
+	LAYER_OUT_ALBEDO = c;
+	ALBEDO = LAYER_OUT_ALBEDO;
+}
+"""), [])
+
+	check_contains(code, "void s_layer_0_applyFog(", "void helpers are carried over")
+	check_eq(undeclared_tokens(code), [] as Array[String], "the void helper call resolves")
+	check_compiles(code, "a void helper compiles")
+
+
 func test_helper_calling_another_helper() -> void:
 	var code := generate(surface(HEAD + """
 uniform float strength = 1.0;

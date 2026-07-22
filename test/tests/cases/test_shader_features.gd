@@ -35,19 +35,34 @@ func test_uniform_with_hint_survives() -> void:
 	check_compiles(code, "hinted uniform compiles")
 
 
-func test_global_const_is_dropped() -> void:
-	var code := _gen("uniform float value = 1.0;\nconst float SCALE = 2.0;\n", """
+func test_global_const_survives() -> void:
+	var code := _gen("uniform float value = 1.0;\nconst float SCALE = 2.0;\nconst float HALF_SCALE = SCALE * 0.5;\n", """
 void fragment() {
 	SETUP_LAYER_FRAGMENT;
-	LAYER_OUT_ALBEDO = vec3(value * SCALE);
+	LAYER_OUT_ALBEDO = vec3(value * SCALE * HALF_SCALE);
 	ALBEDO = LAYER_OUT_ALBEDO;
 }
 """)
-	check_contains(code, "SCALE", "the const is referenced somewhere in the output")
-	check_compiles(code, "a layer shader may declare a global const")
+	check_contains(code, "const float s_layer_0_SCALE = 2.0;",
+		"const is carried over and namespaced")
+	check_contains(code, "s_layer_0_SCALE * 0.5",
+		"a const may reference an earlier const")
+	check_compiles(code, "a layer shader may declare global consts")
 
 
-func test_define_is_dropped() -> void:
+func test_const_array_with_brace_initializer() -> void:
+	var code := _gen("uniform float value = 1.0;\nconst float WEIGHTS[2] = {0.25, 0.75};\n", """
+void fragment() {
+	SETUP_LAYER_FRAGMENT;
+	LAYER_OUT_ALBEDO = vec3(value * WEIGHTS[0] + WEIGHTS[1]);
+	ALBEDO = LAYER_OUT_ALBEDO;
+}
+""")
+	check_contains(code, "s_layer_0_WEIGHTS[2]", "const array keeps its size")
+	check_compiles(code, "a const array with a brace initializer compiles")
+
+
+func test_define_survives() -> void:
 	var code := _gen("uniform float value = 1.0;\n#define DOUBLE(x) ((x) * 2.0)\n", """
 void fragment() {
 	SETUP_LAYER_FRAGMENT;
@@ -55,7 +70,38 @@ void fragment() {
 	ALBEDO = LAYER_OUT_ALBEDO;
 }
 """)
+	check_contains(code, "#define DOUBLE(x) ((x) * 2.0)", "the #define is carried over")
 	check_compiles(code, "a layer shader may use its own #define")
+
+
+const DEFINE_K1 := HEAD + """
+uniform float value = 1.0;
+#define K 1.0
+void fragment() {
+	SETUP_LAYER_FRAGMENT;
+	LAYER_OUT_ALBEDO = vec3(value * K);
+	LAYER_OUT_HEIGHT = 0.5;
+	ALBEDO = LAYER_OUT_ALBEDO;
+}
+"""
+
+const DEFINE_K2 := HEAD + """
+uniform float gain = 1.0;
+#define K 2.0
+void fragment() {
+	SETUP_LAYER_FRAGMENT;
+	LAYER_OUT_ALBEDO = vec3(gain * K);
+	ALBEDO = LAYER_OUT_ALBEDO;
+}
+"""
+
+
+func test_conflicting_defines_keep_the_first() -> void:
+	var code := generate(surface(DEFINE_K1), [texture_masked_layer(DEFINE_K2)])
+
+	check_contains(code, "#define K 1.0", "the first definition is kept")
+	check_not_contains(code, "#define K 2.0", "the conflicting redefinition is dropped")
+	check_compiles(code, "a define conflict still yields a working shader")
 
 
 func test_render_mode_is_dropped() -> void:
@@ -89,18 +135,39 @@ void fragment() {
 	check_compiles(code, "a layer shader may declare an array uniform")
 
 
-func test_struct_is_dropped() -> void:
+func test_struct_survives() -> void:
 	var code := _gen("uniform float value = 1.0;\nstruct Pair { float a; float b; };\n", """
 void fragment() {
 	SETUP_LAYER_FRAGMENT;
-	Pair p;
-	p.a = value;
-	p.b = 1.0;
+	Pair p = Pair(value, 1.0);
 	LAYER_OUT_ALBEDO = vec3(p.a, p.b, 0.0);
 	ALBEDO = LAYER_OUT_ALBEDO;
 }
 """)
+	check_contains(code, "struct s_layer_0_Pair", "struct is carried over and namespaced")
+	check_contains(code, "s_layer_0_Pair(", "the constructor call is renamed to match")
 	check_compiles(code, "a layer shader may declare a struct")
+
+
+const STRUCT_LAYER := HEAD + """
+uniform float value = 1.0;
+struct Pair { float a; float b; };
+void fragment() {
+	SETUP_LAYER_FRAGMENT;
+	Pair p = Pair(value, 1.0);
+	LAYER_OUT_ALBEDO = vec3(p.a, p.b, 0.0);
+	LAYER_OUT_HEIGHT = 0.5;
+	ALBEDO = LAYER_OUT_ALBEDO;
+}
+"""
+
+
+func test_same_struct_name_across_layers() -> void:
+	var code := generate(surface(STRUCT_LAYER), [texture_masked_layer(STRUCT_LAYER)])
+
+	check_contains(code, "struct s_layer_0_Pair", "layer 0 keeps its struct")
+	check_contains(code, "struct s_layer_1_Pair", "layer 1 gets its own struct")
+	check_compiles(code, "two layers may declare the same struct and local names")
 
 
 func test_varying_survives() -> void:
