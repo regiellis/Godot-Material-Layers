@@ -1,0 +1,17 @@
+; Engine configuration file.
+; Test project for the Material Layers addon.
+;
+; addons/materialLayers is GENERATED - it is a copy of ../addon/materialLayers
+; made by run-tests.ps1. Do not edit it here; edit ../addon/materialLayers.
+
+config_version=5
+
+[application]
+
+config/name="material-layers-tests"
+config/features=PackedStringArray("4.5", "Forward Plus")
+run/disable_stderr=false
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/materialLayers/plugin.cfg")

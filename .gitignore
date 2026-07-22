@@ -1,1 +1,5 @@
 *.uid
+
+# Test project: addons/ is a generated copy of ../addon, .godot is Godot's cache.
+test/addons/
+test/.godot/
