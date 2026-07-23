@@ -147,8 +147,7 @@ Both `SurfaceMaterial` and `MaskMaterial` must have the `#include` at the top, a
 - Uniforms, samplers, varyings, global `const`s, `struct`s and helper functions are carried over per layer. Two layers can reuse the same names freely.
 - `instance uniform` works, but the merged shader exposes it under the generated name (`s_layer_<n>_<name>`) on the mesh instance.
 - `#define` macros are shared across the whole stack. Redefining a name with a different body is an error, and the first definition wins.
-- `render_mode` is taken from the base layer only. Render modes on other layers are ignored with a warning.
-- A custom `light()` function is not supported and is ignored.
+- `render_mode` and a custom `light()` function are taken from the base layer only. Other layers' are ignored with a warning.
 
 ### Blending Two SurfaceMaterials
 

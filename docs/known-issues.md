@@ -5,7 +5,7 @@ that was cleanly fixable from the 2026-07-22 audit has been fixed; what is left 
 deliberate design decision or outside the addon's control.
 
 Status as of 2026-07-22, Godot 4.7.1-rc, addon version 0.9.0.
-Run `.\test\run-tests.ps1` to verify: **207 checks, 0 failing**.
+Run `.\test\run-tests.ps1` to verify: **211 checks, 0 failing**.
 
 Fixed on this branch, listed so this file is not mistaken for the full picture: CRLF checkouts
 destroying the shader macros; helper functions failing to compile; the `BENT_NORMAL` token tables
@@ -15,26 +15,33 @@ dedup baking compile-time textures into the shader; missing-base-layer shader sp
 `SETUP_LAYER_*` re-expansion that made missing-table tokens fail silently; the `SETUP_VARYINGS`
 ghost machinery and dead `get_fragment_macros`; the vertex stage having no texture-mask blend path;
 mask textures pinned to raw `UV`; cross-layer identifier accumulation shadowing include-provided
-names; all-or-nothing uniform sync; and the vestigial `use_as_overlay`. See the git history.
+names; all-or-nothing uniform sync; the vestigial `use_as_overlay`; `light()` being dropped
+entirely (the base layer's now carries through, base-wins like `render_mode`, and upper layers
+warn); and the missing engine-version floor (the plugin now `push_error`s at enable time below
+Godot 4.5, since `plugin.cfg` has no compatibility field). See the git history.
 
-Also investigated and closed without a change: uniform defaults referencing a layer `const` were
-listed as un-renamed, but Godot rejects `uniform float x = SOME_CONST;` outright ("Expected constant
-expression"), so the input cannot reach the generator.
+Also investigated and closed without a change:
+
+- Uniform defaults referencing a layer `const`: Godot rejects `uniform float x = SOME_CONST;`
+  outright ("Expected constant expression"), so the input cannot reach the generator.
+- Helper functions referencing layer tokens: `SETUP_LAYER_*` declares the tokens as `fragment()` /
+  `vertex()` locals, so a helper referencing one fails the standalone compile ("Unknown identifier
+  in expression") before it can ever be assigned to a stack. The merged shader simply has the same
+  scoping rules as the authoring shader.
 
 ---
 
 ## Design limitations
 
-- **Helper functions cannot use layer tokens.** `LAYER_OUT_*` and friends exist only inside
-  `fragment()` / `vertex()`, so a helper referencing them does not compile. Only those two bodies go
-  through token substitution; helpers would need struct parameters threaded through, which is a
-  redesign, not a fix.
-- **A custom `light()` function is dropped**, with a `push_warning` naming the layer. Supporting it
-  would mean deciding how N layers' light functions compose, which is the same design problem as
-  `render_mode` but harder.
+- **Non-base layers' `light()` functions are ignored** (with a warning). Composing N light
+  functions has no meaningful answer, so `light()` is base-wins like `render_mode`. If per-layer
+  lighting ever matters, the masks would have to be recomputed or carried into `light()` via
+  varyings, which is a redesign.
 - **Layers sharing a texture cost one sampler slot each.** The deliberate price of removing sampler
-  dedup: correctness of texture swaps won over slot count. Only relevant if a very deep stack
-  approaches driver sampler limits on the Compatibility renderer.
+  dedup: correctness of texture swaps won over slot count. With auto-generate in place, a safe
+  re-dedup (recompile when the texture grouping changes) is now possible; not worth the recompile
+  hitch on texture swaps until a real stack approaches driver sampler limits on the Compatibility
+  renderer.
 - **`group_uniforms` is dropped.** Cosmetic only: the LayerStack inspector hides shader parameters,
   so carried-through groups would decorate uniforms nobody sees.
 
@@ -46,9 +53,6 @@ expression"), so the input cannot reach the generator.
   mtime, until a later recompile restored parity. The in-memory shader is always correct, and the
   headless golden check in `run-tests.ps1` is unaffected; just avoid trusting the on-disk generated
   shader mid-session while it is open in a tab.
-- **`plugin.cfg` cannot declare an engine minimum.** Godot's editor-plugin config has no
-  `compatibility_minimum` field, so the 4.5+ requirement (generated shaders write
-  `BENT_NORMAL_MAP`) is documented in the README instead of enforced at install time.
 
 ---
 
