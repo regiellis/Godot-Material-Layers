@@ -170,6 +170,30 @@ func test_clearing_base_layer_keeps_the_last_shader() -> void:
 		"compile() without a base layer leaves the previous shader untouched")
 
 
+const TOP_WITH_LIGHT := HEAD + """
+uniform vec3 topColor = vec3(0.2, 0.4, 0.1);
+void fragment() {
+	SETUP_LAYER_FRAGMENT;
+	LAYER_OUT_ALBEDO = topColor;
+	ALBEDO = LAYER_OUT_ALBEDO;
+}
+
+void light() {
+	DIFFUSE_LIGHT += vec3(9.0);
+}
+"""
+
+
+func test_upper_layer_light_is_ignored() -> void:
+	# light() is base-wins, like render_mode: an upper layer's light() cannot
+	# compose meaningfully with the base's, so it is warned about and dropped.
+	var code := generate(surface(BASE), [texture_masked_layer(TOP_WITH_LIGHT)])
+
+	check_not_contains(code, "void light", "an upper layer's light() stays out")
+	check_not_contains(code, "vec3(9.0)", "its body does not leak into the output")
+	check_compiles(code, "the stack still compiles")
+
+
 func test_layer_without_surface_material_is_skipped() -> void:
 	var stack := LayerStack.new()
 	stack.base_layer = surface(BASE)

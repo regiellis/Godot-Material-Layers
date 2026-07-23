@@ -196,8 +196,8 @@ void fragment() {
 	check_compiles(code, "an ignored render_mode still yields a working shader")
 
 
-func test_custom_light_is_dropped() -> void:
-	var code := _gen("uniform float value = 1.0;\n", """
+func test_base_layer_light_is_carried() -> void:
+	var code := _gen("uniform float value = 1.0;\nuniform float wrap = 0.5;\n", """
 void fragment() {
 	SETUP_LAYER_FRAGMENT;
 	LAYER_OUT_ALBEDO = vec3(value);
@@ -205,11 +205,12 @@ void fragment() {
 }
 
 void light() {
-	DIFFUSE_LIGHT += ALBEDO * ATTENUATION;
+	DIFFUSE_LIGHT += clamp(dot(NORMAL, LIGHT) + wrap, 0.0, 1.0) * ATTENUATION * LIGHT_COLOR / PI;
 }
 """)
-	check_not_contains(code, "void light", "the light() function is not carried over")
-	check_compiles(code, "a layer with a light() function still compiles")
+	check_contains(code, "void light() {", "the base layer's light() reaches the output")
+	check_contains(code, "s_layer_0_wrap", "uniforms inside light() are namespaced")
+	check_compiles(code, "a stack with a base light() compiles")
 
 
 func test_instance_uniform_survives() -> void:

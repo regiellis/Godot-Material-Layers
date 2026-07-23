@@ -754,12 +754,13 @@ func parse_render_modes(shader: String) -> Array:
 
 
 ## Warns about layer-shader constructs the generator cannot carry into the
-## combined shader.
+## combined shader. Not called for the base layer's surface shader, whose
+## light() is carried through.
 func _validate_layer_shader(code: String, what: String) -> void:
 	var light_regex := RegEx.new()
 	light_regex.compile("void\\s+light\\s*\\(")
 	if light_regex.search(code) != null:
-		push_warning("Material Layers: %s declares a custom light() function, which is not supported in a LayerStack and is ignored." % what)
+		push_warning("Material Layers: %s declares a custom light() function; only the base layer's light() is carried into the generated shader, so it is ignored." % what)
 
 
 ## Records a #define, deduplicating identical redefinitions and reporting
@@ -973,6 +974,33 @@ func get_vertex(shader: String) -> String:
 	while i < n and depth > 0:
 		var c := shader[i]
 		
+		if c == "{":
+			depth += 1
+		elif c == "}":
+			depth -= 1
+		i += 1
+
+	var end := i - 1
+	return shader.substr(start, end - start)
+
+
+## Extracts the body of a custom light() function, brace-matched like
+## get_fragment. Only the base layer's is carried into the generated shader.
+func get_light(shader: String) -> String:
+	var sig := RegEx.new()
+	sig.compile("void\\s+light\\s*\\(\\s*\\)\\s*\\{")
+	var m := sig.search(shader)
+	if not m:
+		return ""
+
+	var i := m.get_end()
+	var start := i
+	var depth := 1
+	var n := shader.length()
+
+	while i < n and depth > 0:
+		var c := shader[i]
+
 		if c == "{":
 			depth += 1
 		elif c == "}":
@@ -1602,6 +1630,7 @@ func _generate_code(assets: Array) -> String:
 	var all_fragment_funcs := []
 	var all_vertex_macros := []
 	var all_vertex_funcs := []
+	var base_light_body := ""
 
 	layer_uniform_maps.clear()
 	
@@ -1628,7 +1657,8 @@ func _generate_code(assets: Array) -> String:
 
 		var surface_c := strip_comments(surface_shader.code)
 
-		_validate_layer_shader(surface_c, "layer %d's surface shader" % slot)
+		if slot > 0:
+			_validate_layer_shader(surface_c, "layer %d's surface shader" % slot)
 		if mask_c != "":
 			_validate_layer_shader(mask_c, "layer %d's mask shader" % slot)
 
@@ -1793,6 +1823,18 @@ func _generate_code(assets: Array) -> String:
 			+ surface_structs["identifiers"] + surface_helper_funcs["identifiers"] \
 			+ surface_parsed_vertex["identifiers"]
 
+		# The base layer's light() carries through wholesale, base-wins like
+		# render_mode. Its locals stay unrenamed (it is the only light()), but
+		# uniform, const, struct and helper references need the slot 0 prefix.
+		if slot == 0:
+			var surface_light := get_light(surface_c)
+			if surface_light != "":
+				var light_decl_identifiers: Array = surface_uniforms["uniform_identifiers"] \
+					+ surface_uniforms["sampler_identifiers"] + surface_consts["identifiers"] \
+					+ surface_structs["identifiers"] + surface_helper_funcs["identifiers"]
+				base_light_body = prefix_vertex_fragment(surface_light, light_decl_identifiers, false, slot)
+				base_light_body = prefix_function_calls(base_light_body, surface_helper_funcs["identifiers"] + surface_structs["identifiers"], false, slot)
+
 		surface_fragment_body = prefix_vertex_fragment(surface_fragment_body, surface_identifiers, false, slot)
 		surface_fragment_body = prefix_function_calls(surface_fragment_body, surface_helper_funcs["identifiers"] + surface_structs["identifiers"], false, slot)
 		surface_fragment_body = blend_layer_data_block(surface_fragment_body,slot)
@@ -1864,6 +1906,11 @@ func _generate_code(assets: Array) -> String:
 	mega_shader.append("".join(all_fragment_funcs))
 	mega_shader.append("\t" + FRAGMENT_OUTPUTS)
 	mega_shader.append("}")
+
+	if base_light_body != "":
+		mega_shader.append("\n\nvoid light() {")
+		mega_shader.append(base_light_body)
+		mega_shader.append("}")
 
 	return "".join(mega_shader)
 
