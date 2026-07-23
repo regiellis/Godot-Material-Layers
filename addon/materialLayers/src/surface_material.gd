@@ -5,10 +5,6 @@
 class_name SurfaceMaterial
 extends ShaderMaterial
 
-@export var use_as_overlay: bool = false:
-	set(val):
-		use_as_overlay = val
-
 const DEFAULT_SHADER_PATH := "res://addons/materialLayers/shaders/surface_material.gdshader"
 
 func _init() -> void:

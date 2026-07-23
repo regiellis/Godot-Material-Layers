@@ -24,11 +24,11 @@ var _auto_compile_queued := false
 ## updates the stack live. For a per-stack copy, use Godot's own Make Unique.
 @export var base_layer: SurfaceMaterial:
 	set(val):
-		if base_layer and base_layer.changed.is_connected(_on_uniform_changed):
-			base_layer.changed.disconnect(_on_uniform_changed)
+		if base_layer and base_layer.changed.is_connected(_on_uniform_changed.bind(base_layer)):
+			base_layer.changed.disconnect(_on_uniform_changed.bind(base_layer))
 		base_layer = val
-		if base_layer and not base_layer.changed.is_connected(_on_uniform_changed):
-			base_layer.changed.connect(_on_uniform_changed)
+		if base_layer and not base_layer.changed.is_connected(_on_uniform_changed.bind(base_layer)):
+			base_layer.changed.connect(_on_uniform_changed.bind(base_layer))
 		_invalidate_assets()
 		_schedule_auto_compile()
 		emit_changed()
@@ -45,10 +45,10 @@ var _auto_compile_queued := false
 				layer.mask_updated.disconnect(_on_mask_updated)
 			if layer and layer.structure_changed.is_connected(_on_structure_changed):
 				layer.structure_changed.disconnect(_on_structure_changed)
-			if layer and layer.surface_material and layer.surface_material.changed.is_connected(_on_uniform_changed):
-				layer.surface_material.changed.disconnect(_on_uniform_changed)
-			if layer and layer.mask_material and layer.mask_material.changed.is_connected(_on_uniform_changed):
-				layer.mask_material.changed.disconnect(_on_uniform_changed)
+			if layer and layer.surface_material and layer.surface_material.changed.is_connected(_on_uniform_changed.bind(layer.surface_material)):
+				layer.surface_material.changed.disconnect(_on_uniform_changed.bind(layer.surface_material))
+			if layer and layer.mask_material and layer.mask_material.changed.is_connected(_on_uniform_changed.bind(layer.mask_material)):
+				layer.mask_material.changed.disconnect(_on_uniform_changed.bind(layer.mask_material))
 		var arr := val.duplicate()
 		for i in arr.size():
 			if arr[i] == null:
@@ -382,13 +382,13 @@ func _reconnect_layer_signals() -> void:
 			layer.structure_changed.disconnect(_on_structure_changed)
 		layer.structure_changed.connect(_on_structure_changed)
 		if layer.surface_material:
-			if layer.surface_material.changed.is_connected(_on_uniform_changed):
-				layer.surface_material.changed.disconnect(_on_uniform_changed)
-			layer.surface_material.changed.connect(_on_uniform_changed)
+			if layer.surface_material.changed.is_connected(_on_uniform_changed.bind(layer.surface_material)):
+				layer.surface_material.changed.disconnect(_on_uniform_changed.bind(layer.surface_material))
+			layer.surface_material.changed.connect(_on_uniform_changed.bind(layer.surface_material))
 		if layer.mask_material:
-			if layer.mask_material.changed.is_connected(_on_uniform_changed):
-				layer.mask_material.changed.disconnect(_on_uniform_changed)
-			layer.mask_material.changed.connect(_on_uniform_changed)
+			if layer.mask_material.changed.is_connected(_on_uniform_changed.bind(layer.mask_material)):
+				layer.mask_material.changed.disconnect(_on_uniform_changed.bind(layer.mask_material))
+			layer.mask_material.changed.connect(_on_uniform_changed.bind(layer.mask_material))
 
 
 func _on_material_replaced() -> void:
@@ -429,9 +429,28 @@ func _on_mask_updated() -> void:
 		update_uniforms(_ensure_assets())
 
 
-func _on_uniform_changed() -> void:
+func _on_uniform_changed(source: ShaderMaterial) -> void:
 	_invalidate_assets()
-	update_uniforms(_ensure_assets())
+	update_uniforms_for(source)
+
+
+## Syncs only the uniforms owned by one source material, including values
+## reverted to null, so an inspector edit costs one material's uniforms
+## instead of a full clear-and-recopy of every parameter on the stack.
+func update_uniforms_for(source: ShaderMaterial) -> void:
+	if source == null or layer_uniform_maps.is_empty():
+		return
+	for layer in layer_uniform_maps:
+		var mat: ShaderMaterial = layer.get("surface_material", null)
+		if mat == null:
+			mat = layer.get("mask_material", null)
+		if mat != source:
+			continue
+		var prefix: String = ("m_layer_%d_" if layer.get("is_mask", false) else "s_layer_%d_") % layer["index"]
+		for id in layer["identifiers"]:
+			set_shader_parameter(prefix + id, source.get_shader_parameter(id))
+		for id in layer.get("sampler_identifiers", []):
+			set_shader_parameter(prefix + id, source.get_shader_parameter(id))
 
 
 func clear_uniforms() -> void:
@@ -1583,8 +1602,6 @@ func _generate_code(assets: Array) -> String:
 	var all_fragment_funcs := []
 	var all_vertex_macros := []
 	var all_vertex_funcs := []
-	var all_identifiers := []
-	var vertex_identifiers := []
 
 	layer_uniform_maps.clear()
 	
@@ -1667,19 +1684,17 @@ func _generate_code(assets: Array) -> String:
 			all_consts.append_array(mask_consts["consts"])
 			all_helper_funcs.append_array(mask_helper_funcs["functions"])
 
-			all_identifiers.append_array(mask_uniforms["uniform_identifiers"])
-			all_identifiers.append_array(mask_uniforms["sampler_identifiers"])
-			all_identifiers.append_array(mask_consts["identifiers"])
-			all_identifiers.append_array(mask_structs["identifiers"])
-			all_identifiers.append_array(mask_helper_funcs["identifiers"])
-			all_identifiers.append_array(mask_parsed_fragment["identifiers"])
-
-			vertex_identifiers.append_array(mask_uniforms["uniform_identifiers"])
-			vertex_identifiers.append_array(mask_uniforms["sampler_identifiers"])
-			vertex_identifiers.append_array(mask_consts["identifiers"])
-			vertex_identifiers.append_array(mask_structs["identifiers"])
-			vertex_identifiers.append_array(mask_helper_funcs["identifiers"])
-			vertex_identifiers.append_array(mask_parsed_vertex["identifiers"])
+			# Identifier renaming is scoped to this mask's own declarations;
+			# using other layers' identifiers here would rename references
+			# that legitimately resolve through an include.
+			var mask_identifiers: Array = mask_uniforms["uniform_identifiers"] \
+				+ mask_uniforms["sampler_identifiers"] + mask_consts["identifiers"] \
+				+ mask_structs["identifiers"] + mask_helper_funcs["identifiers"] \
+				+ mask_parsed_fragment["identifiers"]
+			var mask_vertex_identifiers: Array = mask_uniforms["uniform_identifiers"] \
+				+ mask_uniforms["sampler_identifiers"] + mask_consts["identifiers"] \
+				+ mask_structs["identifiers"] + mask_helper_funcs["identifiers"] \
+				+ mask_parsed_vertex["identifiers"]
 
 			layer_uniform_maps.append({
 				"mask_material": asset["mask_mat"],
@@ -1690,9 +1705,9 @@ func _generate_code(assets: Array) -> String:
 				"is_mask": true,
 			})
 
-			mask_fragment_body = prefix_vertex_fragment(mask_fragment_body, all_identifiers, true, slot)
+			mask_fragment_body = prefix_vertex_fragment(mask_fragment_body, mask_identifiers, true, slot)
 			mask_fragment_body = prefix_function_calls(mask_fragment_body, mask_helper_funcs["identifiers"] + mask_structs["identifiers"], true, slot)
-			mask_vertex_body = prefix_vertex_fragment(mask_vertex_body, vertex_identifiers, true, slot)
+			mask_vertex_body = prefix_vertex_fragment(mask_vertex_body, mask_vertex_identifiers, true, slot)
 			mask_vertex_body = prefix_function_calls(mask_vertex_body, mask_helper_funcs["identifiers"] + mask_structs["identifiers"], true, slot)
 
 		
@@ -1768,21 +1783,17 @@ func _generate_code(assets: Array) -> String:
 		all_global_uniforms = dedup(all_global_uniforms)
 		all_uniforms.append("\n")
 
-		all_identifiers.append_array(surface_uniforms["uniform_identifiers"])
-		all_identifiers.append_array(surface_uniforms["sampler_identifiers"])
-		all_identifiers.append_array(surface_consts["identifiers"])
-		all_identifiers.append_array(surface_structs["identifiers"])
-		all_identifiers.append_array(surface_helper_funcs["identifiers"])
-		all_identifiers.append_array(surface_parsed_fragment["identifiers"])
+		# Scoped to this surface's own declarations, same as the mask path.
+		var surface_identifiers: Array = surface_uniforms["uniform_identifiers"] \
+			+ surface_uniforms["sampler_identifiers"] + surface_consts["identifiers"] \
+			+ surface_structs["identifiers"] + surface_helper_funcs["identifiers"] \
+			+ surface_parsed_fragment["identifiers"]
+		var surface_vertex_identifiers: Array = surface_uniforms["uniform_identifiers"] \
+			+ surface_uniforms["sampler_identifiers"] + surface_consts["identifiers"] \
+			+ surface_structs["identifiers"] + surface_helper_funcs["identifiers"] \
+			+ surface_parsed_vertex["identifiers"]
 
-		vertex_identifiers.append_array(surface_uniforms["uniform_identifiers"])
-		vertex_identifiers.append_array(surface_uniforms["sampler_identifiers"])
-		vertex_identifiers.append_array(surface_consts["identifiers"])
-		vertex_identifiers.append_array(surface_structs["identifiers"])
-		vertex_identifiers.append_array(surface_helper_funcs["identifiers"])
-		vertex_identifiers.append_array(surface_parsed_vertex["identifiers"])
-
-		surface_fragment_body = prefix_vertex_fragment(surface_fragment_body, all_identifiers, false, slot)
+		surface_fragment_body = prefix_vertex_fragment(surface_fragment_body, surface_identifiers, false, slot)
 		surface_fragment_body = prefix_function_calls(surface_fragment_body, surface_helper_funcs["identifiers"] + surface_structs["identifiers"], false, slot)
 		surface_fragment_body = blend_layer_data_block(surface_fragment_body,slot)
 		surface_fragment_body = blend_fragment_block(surface_fragment_body, mask_expr, slot, mask_type, mask_active)
@@ -1799,7 +1810,7 @@ func _generate_code(assets: Array) -> String:
 			all_fragment_funcs.append("\tfinalFragment = fragment_%d_out;" % slot)
 		all_fragment_funcs.append("\n")
 
-		surface_vertex_body = prefix_vertex_fragment(surface_vertex_body, vertex_identifiers, false, slot)
+		surface_vertex_body = prefix_vertex_fragment(surface_vertex_body, surface_vertex_identifiers, false, slot)
 		surface_vertex_body = prefix_function_calls(surface_vertex_body, surface_helper_funcs["identifiers"] + surface_structs["identifiers"], false, slot)
 		surface_vertex_body = blend_vertex_block(surface_vertex_body, vertex_mask_expr, slot, mask_type, mask_active)
 

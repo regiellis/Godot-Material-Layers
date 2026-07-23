@@ -23,6 +23,42 @@ func _gen(globals: String, body: String = TAIL) -> String:
 	return generate(surface(HEAD + globals + body), [])
 
 
+const SEA_LEVEL_BASE := HEAD + """
+uniform float value = 1.0;
+const float SEA_LEVEL = 0.5;
+void fragment() {
+	SETUP_LAYER_FRAGMENT;
+	LAYER_OUT_ALBEDO = vec3(value * SEA_LEVEL);
+	LAYER_OUT_HEIGHT = 0.5;
+	ALBEDO = LAYER_OUT_ALBEDO;
+}
+"""
+
+const SEA_LEVEL_FROM_INCLUDE := """shader_type spatial;
+#include "res://addons/materialLayers/shaders/layer_lib.gdshaderinc"
+#include "res://tests/fixtures/shared_const.gdshaderinc"
+
+uniform float gain = 1.0;
+void fragment() {
+	SETUP_LAYER_FRAGMENT;
+	LAYER_OUT_ALBEDO = vec3(gain * SEA_LEVEL);
+	ALBEDO = LAYER_OUT_ALBEDO;
+}
+"""
+
+
+func test_layer_const_does_not_shadow_another_layers_include() -> void:
+	# Layer 0 declares its own SEA_LEVEL; layer 1 gets SEA_LEVEL from an
+	# include. Identifier renaming is scoped per layer, so layer 1's
+	# reference must stay bare and resolve through the include.
+	var code := generate(surface(SEA_LEVEL_BASE), [texture_masked_layer(SEA_LEVEL_FROM_INCLUDE)])
+
+	check_contains(code, "s_layer_0_SEA_LEVEL", "layer 0's own const is namespaced")
+	check_not_contains(code, "s_layer_1_SEA_LEVEL",
+		"layer 1's include-provided const must not be renamed")
+	check_compiles(code, "an include const shared across layers compiles")
+
+
 func test_setup_macro_is_not_reexpanded() -> void:
 	var code := _gen("uniform float value = 1.0;\n")
 	check_not_contains(code, "SETUP_LAYER_FRAGMENT",

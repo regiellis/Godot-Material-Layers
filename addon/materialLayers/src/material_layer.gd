@@ -26,8 +26,6 @@ signal structure_changed
 @export var surface_material: ShaderMaterial:
 	set(val):
 		surface_material = val
-		if surface_material and surface_material.get("use_as_overlay"):
-			mask_active = false
 		material_replaced.emit()
 		emit_changed()
 

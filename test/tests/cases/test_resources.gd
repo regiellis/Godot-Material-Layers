@@ -162,6 +162,21 @@ func test_shared_texture_layers_keep_their_own_samplers() -> void:
 		"the other layer keeps the original texture")
 
 
+func test_reverting_a_uniform_clears_it_on_the_stack() -> void:
+	var base := surface(TEXTURED)
+	base.set_shader_parameter("tint", Vector3(1, 0, 0))
+	var stack := LayerStack.new()
+	stack.base_layer = base
+	stack.compile()
+	check_eq(stack.get_shader_parameter("s_layer_0_tint"), Vector3(1, 0, 0),
+		"the override reaches the stack")
+
+	base.set_shader_parameter("tint", null)
+	base.emit_changed()
+	check(stack.get_shader_parameter("s_layer_0_tint") == null,
+		"reverting the source uniform reverts the stack to the shader default")
+
+
 func test_mask_uv_controls_reach_the_stack() -> void:
 	var base := surface(TEXTURED)
 	var top := texture_masked_layer(TEXTURED)
