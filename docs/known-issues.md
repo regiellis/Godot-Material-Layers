@@ -4,7 +4,7 @@ The remaining trade-offs and limitations in the addon, kept so nobody re-derives
 that was cleanly fixable from the 2026-07-22 audit has been fixed; what is left below is either a
 deliberate design decision or outside the addon's control.
 
-Status as of 2026-07-22, Godot 4.7.1-rc, addon version 0.9.0.
+Status as of 2026-07-22, Godot 4.7.1-rc, addon version 1.0.0.
 Run `.\test\run-tests.ps1` to verify: **211 checks, 0 failing**.
 
 Fixed on this branch, listed so this file is not mistaken for the full picture: CRLF checkouts
