@@ -508,35 +508,6 @@ func get_includes(shader: String) -> Array:
 	return result
 
 
-func get_global_macros(shader: String) -> Array:
-	var global_macro_regex := RegEx.new()
-	global_macro_regex.compile("SETUP_VARYINGS")
-
-	var result : Array = []
-
-	var matches := global_macro_regex.search_all(shader)
-	for m in matches:
-		result.append(m.get_string().strip_edges() + ";")
-
-	return result
-
-
-func get_fragment_macros(statements: Array) -> Array:
-	var result := []
-	var pattern := RegEx.new()
-	pattern.compile("^[A-Z][A-Z0-9_]+$")
-
-	for s in statements:
-		if s.type != "statement":
-			continue
-		var line : String = s.text.strip_edges().trim_suffix(";")
-		if pattern.search(line) != null:
-			result.append(s.text)
-	
-
-	return result
-
-
 func get_mask_out(statements: Array, index: int) -> String:
 	var mask_out := ""
 	for s in statements:
@@ -1035,7 +1006,11 @@ func parse_fragment(body: String, index: int, extra_types: Array = []) -> Dictio
 			continue
 		var line : String = s.text.strip_edges().trim_suffix(";")
 		if pattern.search(line) != null:
-			macros.append("\t" + s.text + ";")
+			# SETUP_LAYER_* exists so a layer shader compiles standalone; the
+			# merged shader substitutes real struct fields, and re-expanding
+			# the macro would hide missing-table tokens behind dead locals.
+			if not line.begins_with("SETUP_LAYER_"):
+				macros.append("\t" + s.text + ";")
 			s.text = ""
 	
 
@@ -1152,7 +1127,11 @@ func parse_vertex(body: String, index: int, extra_types: Array = []) -> Dictiona
 			continue
 		var line : String = s.text.strip_edges().trim_suffix(";")
 		if pattern.search(line) != null:
-			macros.append("\t" + s.text + ";")
+			# SETUP_LAYER_* exists so a layer shader compiles standalone; the
+			# merged shader substitutes real struct fields, and re-expanding
+			# the macro would hide missing-table tokens behind dead locals.
+			if not line.begins_with("SETUP_LAYER_"):
+				macros.append("\t" + s.text + ";")
 			s.text = ""
 	
 	
@@ -1561,7 +1540,6 @@ func _generate_code(assets: Array) -> String:
 	var mega_shader := PackedStringArray()
 
 	var all_includes := []
-	var all_global_macros := []
 	var all_render_modes := []
 	var all_defines := []
 	var define_bodies := {}
@@ -1620,7 +1598,6 @@ func _generate_code(assets: Array) -> String:
 
 		elif mask_type == MaterialLayer.MaskType.MATERIAL and mask_active:
 			var mask_includes = get_includes(mask_c)
-			var mask_global_macros := get_global_macros(mask_c)
 			var mask_uniforms = parse_uniforms(mask_c, true, slot)
 			var mask_global_uniforms = parse_global_uniforms(mask_c, slot)
 			var mask_varyings = parse_varyings(mask_c, slot)
@@ -1650,7 +1627,6 @@ func _generate_code(assets: Array) -> String:
 
 
 			all_includes.append_array(mask_includes)
-			all_global_macros.append_array(mask_global_macros)
 			all_uniforms.append_array(mask_uniforms["uniforms"])
 			all_global_uniforms.append_array(mask_global_uniforms["uniforms"])
 			all_varyings.append_array(mask_varyings["varyings"])
@@ -1686,8 +1662,6 @@ func _generate_code(assets: Array) -> String:
 			mask_vertex_body = prefix_vertex_fragment(mask_vertex_body, vertex_identifiers, true, slot)
 			mask_vertex_body = prefix_function_calls(mask_vertex_body, mask_helper_funcs["identifiers"] + mask_structs["identifiers"], true, slot)
 
-		
-		var surface_global_macros := get_global_macros(surface_c)
 		
 		var surface_includes := get_includes(surface_c)
 
@@ -1735,9 +1709,6 @@ func _generate_code(assets: Array) -> String:
 			"index": slot,
 			"is_mask": false,
 		})
-
-		all_global_macros.append_array(surface_global_macros)
-		all_global_macros = dedup(all_global_macros)
 
 		all_varyings.append_array(parsed_varyings["varyings"])
 		all_varyings = dedup(all_varyings)
@@ -1821,7 +1792,6 @@ func _generate_code(assets: Array) -> String:
 	mega_shader.append("\n".join(all_includes))
 	mega_shader.append("\n")
 	mega_shader.append("\n".join(all_defines))
-	mega_shader.append("\n".join(all_global_macros) + "\n")
 	mega_shader.append("\n")
 	mega_shader.append("\n".join(all_structs))
 	mega_shader.append("\n")

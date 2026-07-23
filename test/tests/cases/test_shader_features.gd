@@ -23,6 +23,30 @@ func _gen(globals: String, body: String = TAIL) -> String:
 	return generate(surface(HEAD + globals + body), [])
 
 
+func test_setup_macro_is_not_reexpanded() -> void:
+	var code := _gen("uniform float value = 1.0;\n")
+	check_not_contains(code, "SETUP_LAYER_FRAGMENT",
+		"the fragment setup macro stays out of the merged shader")
+	check_not_contains(code, "SETUP_LAYER_VERTEX",
+		"the vertex setup macro stays out of the merged shader")
+	check_compiles(code, "the merged shader works without the macro's locals")
+
+
+func test_unknown_layer_token_fails_loudly() -> void:
+	# Without the re-expanded macro, a token missing from the substitution
+	# tables is an undeclared identifier instead of a silent constant.
+	var code := _gen("uniform float value = 1.0;\n", """
+void fragment() {
+	SETUP_LAYER_FRAGMENT;
+	LAYER_OUT_BOGUS = value;
+	LAYER_OUT_ALBEDO = vec3(value);
+	ALBEDO = LAYER_OUT_ALBEDO;
+}
+""")
+	check(not compiles(code),
+		"an unsubstituted layer token must be a compile error, not a silent default")
+
+
 func test_plain_uniform_survives() -> void:
 	var code := _gen("uniform float value = 1.0;\n")
 	check_contains(code, "uniform float s_layer_0_value", "plain uniform is kept")

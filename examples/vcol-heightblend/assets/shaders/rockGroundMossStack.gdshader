@@ -7,7 +7,6 @@ shader_type spatial;
 #include "res://assets/shaders/includes/utils.gdshaderinc"
 
 
-
 varying vec3 localPos;
 varying vec3 worldPos;
 
@@ -91,8 +90,7 @@ void vertex() {
 	    VERTEX,
 		0.5
 	);
-		SETUP_LAYER_VERTEX;
-
+	
 	vertexMaterial vertex_0_out = DEFAULT_VERTEX;
 	float s_layer_0_height = texture(s_layer_0_normAOHeight, UV).a;
 	vec3 s_layer_0_displacement = displacement(VERTEX, NORMAL, s_layer_0_height, s_layer_0_heightOffset_d, s_layer_0_dispStrength);
@@ -177,8 +175,7 @@ void fragment() {
 	    0.0,                      
 	    0.0                
 	);
-		SETUP_LAYER_FRAGMENT;
-
+	
 	layerData layer_0_data = DEFAULT_LAYER_DATA;
 	fragmentMaterial fragment_0_out = DEFAULT_FRAGMENT;
 	vec2 s_layer_0_uv = UV * s_layer_0_UVScale;
