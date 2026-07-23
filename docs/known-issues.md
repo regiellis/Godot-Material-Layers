@@ -40,6 +40,12 @@ missing base layer emitting a broken shader instead of a clear error. See the gi
   `render_mode` but harder.
 - **`group_uniforms` is silently dropped.** Cosmetic only: uniforms lose their inspector grouping,
   and the LayerStack inspector hides shader parameters anyway.
+- **An open Shader Editor tab can shadow the generated shader's disk save.** Observed once while
+  driving the editor: with `rockGroundMossStack.gdshader` open in a Shader Editor tab, an
+  auto-generate recompile updated the rendered material but the file on disk kept the previous
+  content despite a fresh mtime, until a later recompile restored parity. The in-memory shader is
+  always correct, and the headless golden check in `run-tests.ps1` is unaffected; just avoid
+  trusting the on-disk generated shader mid-session while it is open in a tab.
 - **`use_as_overlay` is vestigial.** `SurfaceMaterial.use_as_overlay` only forces `mask_active = false`
   in `material_layer.gd`; nothing in code generation reads it.
 - **`plugin.cfg` declares no `compatibility_minimum`.** `FRAGMENT_OUTPUTS` writes `BENT_NORMAL_MAP`,
