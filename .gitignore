@@ -11,8 +11,12 @@ test/.godot/
 examples/vcol-heightblend/addons/
 examples/vcol-heightblend/.godot/
 
-# Personal agent tooling, kept out of the fork's history.
+# Personal agent tooling, kept out of the fork's history. CLAUDE.md and
+# WARDEN.md are the agent context docs and protocol; they live on disk at any
+# depth but are never published.
 .claude/
 .warden/
 KARA.md
 KIKO.md
+CLAUDE.md
+WARDEN.md
