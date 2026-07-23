@@ -168,7 +168,7 @@ vertexMaterial l_mixVertex(
     return result;
 }
 
-float l_getChannel(vec4 tex, vec2 uv, int ch) {
+float l_getChannel(vec4 tex, int ch) {
 	if (ch == 0) return tex.r;
 	if (ch == 1) return tex.g;
 	if (ch == 2) return tex.b;

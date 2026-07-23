@@ -841,24 +841,44 @@ func layer_data_out(index: int) -> String:
 func mask_texture_uniforms(channel_select: int, index: int) -> Array:
 	var result := []
 	if index != 0:
-		var mask_sampler := "uniform sampler2D m_layer_%d_mask_sampler;" % index
-		var mask_channel := "uniform int m_layer_%d_mask_channel = %d;" % [index, channel_select]
-		result.append(mask_sampler)
-		result.append(mask_channel)
+		result.append("uniform sampler2D m_layer_%d_mask_sampler;" % index)
+		result.append("uniform int m_layer_%d_mask_channel = %d;" % [index, channel_select])
+		result.append("uniform vec2 m_layer_%d_mask_uv_scale = vec2(1.0);" % index)
+		result.append("uniform vec2 m_layer_%d_mask_uv_offset = vec2(0.0);" % index)
+		result.append("uniform bool m_layer_%d_mask_uv2 = false;" % index)
 
 	return result
 
 
+## The UV expression for a layer's mask texture, honouring the layer's mask
+## UV scale, offset and UV2 switch.
+func mask_uv_expr(index: int) -> String:
+	return "(mix(UV, UV2, float(m_layer_%d_mask_uv2)) * m_layer_%d_mask_uv_scale + m_layer_%d_mask_uv_offset)" % [index, index, index]
+
+
 func mask_texture_sample(index: int) -> Dictionary:
-	var u_v := "UV"
 	var mask := ""
 	var result := ""
 	if index != 0:
-		var layer_mask_sampler := "\nvec4 m_layer_%d_mask = texture(m_layer_%d_mask_sampler, UV);\n" % [index, index]
-		mask = "l_getChannel(m_layer_%d_mask, " % index + u_v + " ,m_layer_%d_mask_channel)" % index
+		var layer_mask_sampler := "\nvec4 m_layer_%d_mask = texture(m_layer_%d_mask_sampler, %s);\n" % [index, index, mask_uv_expr(index)]
+		mask = "l_getChannel(m_layer_%d_mask, m_layer_%d_mask_channel)" % [index, index]
 		result += "\n" + layer_mask_sampler.indent("\t")
 
 	return {"fragment": result, "mask": mask}
+
+
+## The vertex-stage twin of mask_texture_sample, so texture-masked layers can
+## blend their vertex output (displacement) too. textureLod avoids derivative
+## requirements in the vertex stage.
+func mask_texture_sample_vertex(index: int) -> Dictionary:
+	var mask := ""
+	var result := ""
+	if index != 0:
+		var sampler_line := "\nvec4 m_layer_%d_mask_v = textureLod(m_layer_%d_mask_sampler, %s, 0.0);\n" % [index, index, mask_uv_expr(index)]
+		mask = "l_getChannel(m_layer_%d_mask_v, m_layer_%d_mask_channel)" % [index, index]
+		result += "\n" + sampler_line.indent("\t")
+
+	return {"vertex": result, "mask": mask}
 
 
 func blend_fragment_block(fragment: String, mask: String, index: int, mask_type: int, mask_active: bool) -> String:
@@ -879,6 +899,8 @@ func blend_vertex_block(vertex: String, mask: String, index: int, mask_type: int
 
 	if index == 0:
 		result += "\n\n\t" + "vertexMaterial finalVertex = vertex_0_out;\n"
+	elif mask_active and mask_type == MaterialLayer.MaskType.TEXTURE:
+		result += "\n\n\t" + "finalVertex = l_mixVertex(finalVertex, " + current_layer + ", " + mask + ");\n"
 
 	return result
 
@@ -1481,10 +1503,11 @@ func set_mask_uniforms(assets: Array):
 	for asset in assets:
 		var slot : int = asset["slot"]
 		if asset and asset["mask_texture"]:
-			var sampler_param = "m_layer_%d_mask_sampler" % slot
-			var channel_param = "m_layer_%d_mask_channel" % slot
-			self.set_shader_parameter(sampler_param, asset["mask_texture"])
-			self.set_shader_parameter(channel_param, asset["mask_texture_channel"])
+			self.set_shader_parameter("m_layer_%d_mask_sampler" % slot, asset["mask_texture"])
+			self.set_shader_parameter("m_layer_%d_mask_channel" % slot, asset["mask_texture_channel"])
+			self.set_shader_parameter("m_layer_%d_mask_uv_scale" % slot, asset["mask_uv_scale"])
+			self.set_shader_parameter("m_layer_%d_mask_uv_offset" % slot, asset["mask_uv_offset"])
+			self.set_shader_parameter("m_layer_%d_mask_uv2" % slot, asset["mask_uv2"])
 
 
 
@@ -1506,6 +1529,9 @@ func _collect_layer_assets() -> Array:
 		"mask_active": false,
 		"mask_texture": null,
 		"mask_texture_channel": MaterialLayer.TextureChannel.RED,
+		"mask_uv_scale": Vector2.ONE,
+		"mask_uv_offset": Vector2.ZERO,
+		"mask_uv2": false,
 	})
 
 	for i in layers.size():
@@ -1528,6 +1554,9 @@ func _collect_layer_assets() -> Array:
 			"mask_active": mask_active,
 			"mask_texture": mask_texture,
 			"mask_texture_channel": mask_texture_channel,
+			"mask_uv_scale": layer.mask_uv_scale,
+			"mask_uv_offset": layer.mask_uv_offset,
+			"mask_uv2": layer.mask_uv2,
 			"mask_mat": mask_mat,
 			"mask_shader": mask_shader,
 		})
@@ -1564,6 +1593,7 @@ func _generate_code(assets: Array) -> String:
 		var mask_type: int = asset["mask_type"]
 		var mask_active: bool = asset["mask_active"]
 		var mask_expr = "1.0"
+		var vertex_mask_expr = "1.0"
 
 		var surface_shader: Shader = asset["surface_shader"]
 		if surface_shader == null:
@@ -1592,9 +1622,12 @@ func _generate_code(assets: Array) -> String:
 			var mask_texture_channel : int = asset["mask_texture_channel"]
 			var mask_fragment = mask_texture_sample(slot)
 			mask_expr = mask_fragment["mask"]
-			
+			var mask_vertex_sample = mask_texture_sample_vertex(slot)
+			vertex_mask_expr = mask_vertex_sample["mask"]
+
 			all_uniforms.append_array(mask_texture_uniforms(mask_texture_channel, slot))
 			all_fragment_funcs.append(mask_fragment["fragment"])
+			all_vertex_funcs.append(mask_vertex_sample["vertex"])
 
 		elif mask_type == MaterialLayer.MaskType.MATERIAL and mask_active:
 			var mask_includes = get_includes(mask_c)
@@ -1768,7 +1801,7 @@ func _generate_code(assets: Array) -> String:
 
 		surface_vertex_body = prefix_vertex_fragment(surface_vertex_body, vertex_identifiers, false, slot)
 		surface_vertex_body = prefix_function_calls(surface_vertex_body, surface_helper_funcs["identifiers"] + surface_structs["identifiers"], false, slot)
-		surface_vertex_body = blend_vertex_block(surface_vertex_body, mask_expr, slot, mask_type, mask_active)
+		surface_vertex_body = blend_vertex_block(surface_vertex_body, vertex_mask_expr, slot, mask_type, mask_active)
 
 		all_vertex_funcs.append(vertex_layer_out(slot))
 		all_vertex_funcs.append(surface_vertex_body)

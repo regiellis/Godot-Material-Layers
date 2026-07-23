@@ -91,6 +91,35 @@ func test_material_masked_layer() -> void:
 	check_compiles(code, "material-masked stack compiles")
 
 
+const DISPLACING_TOP := HEAD + """
+uniform vec3 topColor = vec3(0.2, 0.4, 0.1);
+uniform float lift = 1.0;
+
+void vertex() {
+	SETUP_LAYER_VERTEX;
+	LAYER_OUT_VERTEX = VERTEX + vec3(0.0, lift, 0.0);
+	LAYER_OUT_HEIGHT = 0.5;
+}
+
+void fragment() {
+	SETUP_LAYER_FRAGMENT;
+	LAYER_OUT_ALBEDO = topColor;
+	ALBEDO = LAYER_OUT_ALBEDO;
+}
+"""
+
+
+func test_texture_mask_blends_the_vertex_stage() -> void:
+	var code := generate(surface(BASE), [texture_masked_layer(DISPLACING_TOP)])
+
+	check_contains(code, "m_layer_1_mask_v",
+		"the mask texture is sampled in the vertex stage")
+	check_contains(code, "l_mixVertex(finalVertex, vertex_1_out",
+		"the layer's vertex output blends through the mask")
+	check_eq(undeclared_tokens(code), [] as Array[String], "no dangling namespaced tokens")
+	check_compiles(code, "a displacing texture-masked layer compiles")
+
+
 func test_inactive_mask_replaces_result() -> void:
 	var layer := texture_masked_layer(TOP)
 	layer.mask_active = false

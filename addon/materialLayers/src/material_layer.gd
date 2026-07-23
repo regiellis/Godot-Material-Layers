@@ -62,6 +62,25 @@ enum TextureChannel { RED, GREEN, BLUE, ALPHA }
 		mask_updated.emit()
 		emit_changed()
 
+@export var mask_uv_scale: Vector2 = Vector2.ONE:
+	set(val):
+		mask_uv_scale = val
+		mask_updated.emit()
+		emit_changed()
+
+@export var mask_uv_offset: Vector2 = Vector2.ZERO:
+	set(val):
+		mask_uv_offset = val
+		mask_updated.emit()
+		emit_changed()
+
+## Sample the mask texture with the mesh's second UV channel.
+@export var mask_uv2: bool = false:
+	set(val):
+		mask_uv2 = val
+		mask_updated.emit()
+		emit_changed()
+
 ## Stored by reference, like surface_material.
 @export var mask_material: ShaderMaterial:
 	set(val):
@@ -71,11 +90,11 @@ enum TextureChannel { RED, GREEN, BLUE, ALPHA }
 
 
 func _validate_property(property: Dictionary) -> void:
-	if property.name == "mask_type" or property.name == "mask_material" or property.name == "mask_texture" or property.name == "mask_texture_channel":
+	if property.name in ["mask_type", "mask_material", "mask_texture", "mask_texture_channel", "mask_uv_scale", "mask_uv_offset", "mask_uv2"]:
 		if !mask_active:
 			property.usage &= ~PROPERTY_USAGE_EDITOR
 
-	if property.name == "mask_texture" or property.name == "mask_texture_channel":
+	if property.name in ["mask_texture", "mask_texture_channel", "mask_uv_scale", "mask_uv_offset", "mask_uv2"]:
 		if mask_type != MaskType.TEXTURE:
 			property.usage &= ~PROPERTY_USAGE_EDITOR
 

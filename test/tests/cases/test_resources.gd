@@ -162,6 +162,32 @@ func test_shared_texture_layers_keep_their_own_samplers() -> void:
 		"the other layer keeps the original texture")
 
 
+func test_mask_uv_controls_reach_the_stack() -> void:
+	var base := surface(TEXTURED)
+	var top := texture_masked_layer(TEXTURED)
+	top.mask_uv_scale = Vector2(3, 3)
+	top.mask_uv2 = true
+
+	var stack := LayerStack.new()
+	stack.base_layer = base
+	stack.layers = [top] as Array[MaterialLayer]
+	stack.compile()
+
+	var code: String = stack.shader.code
+	check_contains(code, "uniform vec2 m_layer_1_mask_uv_scale", "mask UV scale uniform exists")
+	check_contains(code, "uniform bool m_layer_1_mask_uv2", "mask UV2 switch uniform exists")
+	check_compiles(code, "mask UV controls compile")
+	check_eq(stack.get_shader_parameter("m_layer_1_mask_uv_scale"), Vector2(3, 3),
+		"the layer's UV scale reaches the generated material")
+	check_eq(stack.get_shader_parameter("m_layer_1_mask_uv2"), true,
+		"the UV2 switch reaches the generated material")
+
+	# mask_updated is emitted synchronously, so this propagates without frames.
+	top.mask_uv_offset = Vector2(0.5, 0.25)
+	check_eq(stack.get_shader_parameter("m_layer_1_mask_uv_offset"), Vector2(0.5, 0.25),
+		"a UV offset edit propagates live without a recompile")
+
+
 func test_null_layer_entry_becomes_a_real_layer() -> void:
 	var stack := LayerStack.new()
 	stack.layers = [null] as Array[MaterialLayer]
