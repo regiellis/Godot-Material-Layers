@@ -1,13 +1,13 @@
-[<img target="_newtab" src="assets/materialLayerHeader3.webp">](https://store.godotengine.org)
+<img src="assets/materialLayerHeader3.webp">
 
 > [!WARNING]
 > This fork diverges heavily from [Foyezes/Godot-Material-Layers](https://github.com/Foyezes/Godot-Material-Layers).
 > Changes here follow the maintainer's personal taste and are not coordinated with upstream.
 > For the original plugin, use the upstream repository and its Asset Store releases.
 
-## Download
+## Installation
 
-Available in the [Godot Asset Store](https://store.godotengine.org/asset/foyezes/material-layers/) in editor. See all [releases](https://github.com/Foyezes/Godot-Material-Layers/releases).
+Copy `addon/materialLayers` into your project as `addons/materialLayers`, then enable **MaterialLayers** under Project > Project Settings > Plugins. Requires Godot 4.5 or newer; the generated shaders write `BENT_NORMAL_MAP`.
 
 ## Example project
 
@@ -167,7 +167,7 @@ Then create a new `Material Layer` and assign a different `SurfaceMaterial` to t
 <img align="top" width="440" alt="materialLayer1" src="assets/materialLayer1.webp" />
 <img align="top" width="440" alt="materialLayer2" src="assets/materialLayer2.webp" />
 
-You can either use a mask texture...
+You can either use a mask texture, with per-layer UV scale, offset and a UV2 switch...
 
 <img width="1668" alt="textureMask" src="assets/textureMask.webp" />
 
