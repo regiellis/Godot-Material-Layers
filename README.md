@@ -4,6 +4,8 @@
 > This fork diverges heavily from [Foyezes/Godot-Material-Layers](https://github.com/Foyezes/Godot-Material-Layers).
 > Changes here follow the maintainer's personal taste and are not coordinated with upstream.
 > For the original plugin, use the upstream repository and its Asset Store releases.
+> This fork is deliberately not published to the Asset Library and never will be; install it from
+> source or the [GitHub releases](https://github.com/regiellis/Godot-Material-Layers/releases).
 
 ## Installation
 
